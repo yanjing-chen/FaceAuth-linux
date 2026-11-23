@@ -46,7 +46,7 @@ class SettingsRedesignTests(unittest.TestCase):
         """
         expected = {
             'scripts/capture_bridge.py': 'a42e31330a8b642eeca1d7596b20cc39b2eee38149275f26d9594edaf55de02f',
-            'scripts/client.py': '295c459d892c03774743fbdd21e235c82c711b3fcba7e9e4733983cd6139c126',
+            'scripts/client.py': 'a3c61483502fd59809e5056ccc67de3ecbc8dae65563a86db585f6318e4284de',
             'scripts/infer_engine.py': 'ca5933dc2717365ff16ed51a543641f10112bc86ad665ab20d38fc49eeda3212',
             'scripts/install-system.sh': '15e9ac1621717bc7684a5a6dee04b92394d7ffbbd2da58633d2d6ab8ffce93c8',
             'scripts/launch-gui.sh': 'cc249d16cb991b24ea3a06f7bc94e6640ea6504f644c303842ab7b4dacab4b66',
@@ -61,7 +61,7 @@ class SettingsRedesignTests(unittest.TestCase):
             'src/core/src/protocol.rs': '6cee4651880954bee6ae8eb4998f008bc259c4e7f5d865358248643dcbd31aa6',
             'src/core/src/scene.rs': 'c714e06dda49b9bec075d36dc48ddc18226af8c0592e8329582a6964f4ae87da',
             'src/core/src/store.rs': '944d3f15fb06f26fd19fd0f4e0a79c0d63f21375c0929990733a670c4530c02f',
-            'src/daemon/src/main.rs': 'dfb45ae208f162a0e90d6c985ffa8a8487aa9078045bae919412cf02c4cfea67',
+            'src/daemon/src/main.rs': '64a2fba19cdfd7e07fa7ca3e60929467c7c42b488b0a095788e1f0dbfb9562ac',
             'src/pam/src/lib.rs': '38a91653128941f5ca6459f6e773463b19908a97fed68bcc6c0c1e289293c34b',
             'src/scene-admin/src/main.rs': '518de2847a4668d251273713284fb4acf4e0b0f2acc20ab62fd2081b80bf8a64',
         }

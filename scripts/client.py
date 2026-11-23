@@ -46,6 +46,44 @@ def valid_label(label):
                 and not any(c.isspace() or c in ',/\\' or ord(c)<32 for c in label))
 
 
+MODEL_AUTH_ACTION = 'org.faceauth.rebuild.manage-models'
+
+
+def require_admin_auth(timeout=60):
+    """Trigger the polkit agent to ask for administrator authorization.
+    Returns (ok, message). This process stays unprivileged: pkcheck only asks
+    polkit to authenticate the current user via the GNOME agent; it does NOT
+    raise our GUI's privileges, so Wayland environment and camera preview stay
+    intact. The daemon independently verifies the same authorization.
+    """
+    try:
+        import subprocess
+        # polkit requires pid,start-time,uid (bare pid is racy/rejected).
+        pid = os.getpid()
+        raw = open(f'/proc/{pid}/stat', encoding='utf-8').read()
+        starttime = raw[raw.rfind(')') + 1:].split()[19]
+        subject = f'{pid},{starttime},{os.getuid()}'
+        proc = subprocess.run(
+            ['/usr/bin/pkcheck', '--action-id', MODEL_AUTH_ACTION,
+             '--process', subject, '--allow-user-interaction'],
+            capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError:
+        return False, 'polkit 工具不可用'
+    except subprocess.TimeoutExpired:
+        return False, '授权请求超时'
+    except Exception as exc:
+        return False, f'授权请求失败：{exc}'
+    # pkcheck exit 0 with 'polkit.result=auth_admin' means auth is required
+    # but was not interactively granted; treat as denied.
+    out = (proc.stdout or '') + (proc.stderr or '')
+    needs = any(t in out for t in ('auth_admin', 'auth_self'))
+    if proc.returncode == 0 and not needs:
+        return True, 'ok'
+    if 'dismissed' in out.lower() or proc.returncode == 3:
+        return False, '已取消管理员授权'
+    return False, '未通过管理员授权（需要输入密码或指纹）'
+
+
 def load_config():
     cfg = dict(DEFAULTS)
     try:

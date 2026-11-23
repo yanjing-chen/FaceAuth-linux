@@ -25,7 +25,7 @@ from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 
 from client import (request, current_socket, load_config, save_config,
                     migrate_obsolete_settings, list_video_devices,
-                    short_device_label, valid_label)
+                    short_device_label, valid_label, require_admin_auth)
 from recognition_result import interpret_test_reply
 
 MODES = [('rgb', '单 RGB（彩色）'), ('ir', '单 IR（红外）'), ('dual', '双模 RGB + IR')]
@@ -752,9 +752,22 @@ class FaceAuthApp(Adw.Application):
             self.status.set_label('名称不得包含空格、逗号、斜杠，UTF-8 总长度不超过 64 字节')
             return
         self.set_busy(True)
+        self.status.set_label('正在请求管理员授权…（GUI 保持普通用户，不会白屏）')
+        # 授权在后台线程进行，避免阻塞 GTK 主线程导致预览冻结；
+        # polkit 弹框由 GNOME agent 显示，GUI 环境变量不变。
+        def ask():
+            ok, msg = require_admin_auth()
+            GLib.idle_add(self._enroll_after_auth, ok, msg, label)
+        threading.Thread(target=ask, daemon=True, name='faceauth-auth').start()
+
+    def _enroll_after_auth(self, ok, msg, label):
+        if not ok:
+            self.set_busy(False)
+            self.status.set_label('录入未开始：' + msg)
+            return
         self.preview.pause()  # stop new preview polls before exclusive capture
         self.progress.set_fraction(0)
-        self.status.set_label('正在采集 5 帧并进行活体检测，请正视摄像头…')
+        self.status.set_label('授权通过，正在采集 5 帧并进行活体检测，请正视摄像头…')
         self.async_request(f'ENROLL_CAPTURE {self.user} {label}', self.enroll_done, timeout=28)
 
     def enroll_done(self, response):
@@ -925,6 +938,17 @@ class FaceAuthApp(Adw.Application):
 
     def delete_confirmed(self, result, label):
         if result != 'delete':
+            return
+        self.status.set_label('正在请求管理员授权以保持人脸数据安全…')
+        def ask():
+            ok, msg = require_admin_auth()
+            GLib.idle_add(self._delete_after_auth, ok, msg, label)
+        threading.Thread(target=ask, daemon=True, name='faceauth-auth').start()
+
+    def _delete_after_auth(self, ok, msg, label):
+        if not ok:
+            self.status.set_label('删除未执行：' + msg)
+            self.settings_feedback.set_label('人脸管理：' + msg)
             return
         command = (f'DELETE_FACE {self.user} {label}' if label else f'DELETE {self.user}')
         self.async_request(command, self.delete_done)
