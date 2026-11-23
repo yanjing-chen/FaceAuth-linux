@@ -19,6 +19,12 @@ import numpy as np
 # Keep single frame bounded even for 4K webcams.
 MAX_WIDTH, MAX_HEIGHT = 800, 600
 
+# 丢弃冷启动头几帧：V4L2 设备刚打开时自动曝光/白平衡/补光尚未稳定，
+# 直接抓第一帧会偏暗或模糊，导致识别相似度忽高忽低。
+# 这是原版 capture.rs 里 warmup=2 的设计，Rebuild 版曾丢失此处，
+# 造成"预览正常但认证时常不通过"。3 帧比 2 帧更保险，代价仅约几十毫秒。
+WARMUP_FRAMES = 3
+
 
 def index_for(path):
     target = os.path.realpath(path)
@@ -37,6 +43,16 @@ def open_cap(path):
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    # 预热：丢弃前 WARMUP_FRAMES 帧，等曝光/补光稳定。
+    # 只影响 OPEN 之后的首次取帧（认证/录入都会受益），不触碰 PREVIEW 的持续取帧路径。
+    # 单帧读取失败不应让整个 OPEN 失败，故容错处理。
+    for _ in range(WARMUP_FRAMES):
+        try:
+            ok, _ = cap.read()
+        except Exception:
+            break
+        if not ok:
+            break
     return cap
 
 
