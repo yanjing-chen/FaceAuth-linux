@@ -1,0 +1,7 @@
+# FaceAuth 0.1 config: saved as ~/.config/faceauth/config with chmod 0600
+mode=dual
+rgb_device=/dev/v4l/by-id/REPLACE_ME_RGB
+ir_device=/dev/v4l/by-id/REPLACE_ME_IR
+liveness=heuristic
+threshold=0.6
+# infer_program is intentionally ignored: root code execution cannot be user-controlled.

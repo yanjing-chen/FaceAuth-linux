@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = ["src/core", "src/daemon", "src/pam", "src/cli", "src/scene-admin"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+panic = "abort"
+codegen-units = 1

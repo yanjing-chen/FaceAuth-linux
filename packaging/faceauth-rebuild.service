@@ -1,0 +1,24 @@
+[Unit]
+Description=FaceAuth Rebuild privileged camera and authentication daemon
+After=local-fs.target systemd-udev-settle.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/libexec/faceauth-rebuild/faceauth-daemon
+RuntimeDirectory=faceauth-rebuild
+RuntimeDirectoryMode=0755
+StateDirectory=faceauth-rebuild
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+# Deliberately do not use ProtectHome or PrivateDevices: the daemon needs
+# owner-only per-user config and V4L2 devices. PAM writes happen only after
+# interactive administrator authorization; scene paths are allowlisted.
+
+[Install]
+WantedBy=multi-user.target

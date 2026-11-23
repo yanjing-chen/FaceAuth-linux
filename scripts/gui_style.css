@@ -1,0 +1,54 @@
+/* FaceAuth Rebuild 0.1.8: restrained Adwaita-friendly visual identity.
+   No custom titlebar, no window transparency, no touch of camera stream. */
+.fa-overview { padding: 0; }
+.fa-mode-badge {
+  background-color: alpha(@accent_color, .10);
+  color: @accent_color;
+  border: 1px solid alpha(@accent_color, .18);
+  padding: 7px 12px;
+  border-radius: 99px;
+  font-size: .9em;
+  font-weight: 600;
+}
+.fa-camera {
+  background-color: #20252d;
+  border: 1px solid alpha(black, .13);
+  border-radius: 17px;
+  padding: 6px;
+  box-shadow: 0 2px 9px alpha(black, .10);
+}
+.fa-camera picture { border-radius: 12px; }
+.fa-live-tag {
+  border-radius: 99px;
+  padding: 6px 11px;
+  background-color: alpha(black, .65);
+  color: #ffffff;
+  font-size: .83em;
+  font-weight: 600;
+}
+.fa-small-note { font-size: .85em; }
+.fa-sidebar {
+  background-color: @card_bg_color;
+  border: 1px solid alpha(@window_fg_color, .14);
+  border-radius: 16px;
+  padding: 17px;
+  box-shadow: 0 1px 5px alpha(black, .035);
+}
+.fa-field-label { font-size: .9em; font-weight: 600; }
+.fa-action-button { min-height: 38px; font-weight: 600; }
+.fa-progress { min-height: 3px; }
+.fa-status { font-size: .9em; opacity: .88; }
+.fa-result {
+  border-top: 1px solid alpha(@window_fg_color, .15);
+  padding: 12px 0 0 0;
+}
+.fa-settings preferencesgroup { margin-bottom: 2px; }
+
+/* Settings dashboard: compact paired columns, native Adwaita groups. */
+.fa-settings { padding: 0; }
+.fa-settings-grid { margin-top: 2px; }
+.fa-settings-column { min-width: 0; }
+.fa-settings-actions { padding: 6px 8px 2px; }
+.fa-refresh-button { min-height: 34px; padding: 0 12px; }
+.fa-small-button { min-height: 30px; padding: 0 10px; }
+.fa-settings-footer { padding: 3px 2px; font-size: .89em; }

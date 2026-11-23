@@ -1,0 +1,7 @@
+[package]
+name = "pam_faceauth"
+version = "0.1.8"
+edition = "2021"
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
