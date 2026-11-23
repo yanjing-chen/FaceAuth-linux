@@ -75,6 +75,15 @@ def do_embed(gray, w, h):
     return feat.flatten().tolist()
 
 
+def _enhance_ir(gray):
+    """IR 帧对比度增强：暗帧（验收记录亮度均值约 5.6）直接送 YuNet 检出率低，
+    CLAHE 直方图均衡后检出率显著提升。只用于活体检测，不改变识别特征计算。"""
+    try:
+        return cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+    except Exception:
+        return gray
+
+
 def do_liveness(gray, w, h):
     """
     活体检测（启发式，IR 灰度帧）：
@@ -85,8 +94,9 @@ def do_liveness(gray, w, h):
     init_models()
     if gray.ndim != 2:
         return 0.0
-    # 人脸检测
-    bgr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+    # 人脸检测：IR 帧先做对比度增强，提升暗帧下的人脸检出率
+    enhanced = _enhance_ir(gray)
+    bgr = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
     detector.setInputSize((w, h))
     _, faces = detector.detect(bgr)
     if faces is None or len(faces) == 0:
@@ -94,7 +104,7 @@ def do_liveness(gray, w, h):
     best = max(faces, key=lambda f: f[-1])
     x, y, bw, bh = best[:4]
     area_ratio = (bw * bh) / (w * h)
-    face_region = gray[int(y):int(y + bh), int(x):int(x + bw)]
+    face_region = enhanced[int(y):int(y + bh), int(x):int(x + bw)]
     if face_region.size == 0:
         return 0.0
     # 纹理丰富度（拉普拉斯方差）：打印照片/屏幕通常低于真人

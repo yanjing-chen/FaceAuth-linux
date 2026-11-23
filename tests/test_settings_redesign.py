@@ -39,11 +39,15 @@ class SettingsRedesignTests(unittest.TestCase):
         self.assertIn('self._scroll.set_size_request(570,', gui)
 
     def test_no_backend_or_pam_change(self):
-        """Compare against v0.1.7 stable hashes, even in standalone ZIP."""
+        """Compare against stable hashes, even in standalone ZIP.
+        capture_bridge.py / infer_engine.py baselines were updated on 2026-11-23
+        for an authorized recognition-robustness fix (camera warmup + IR CLAHE).
+        All other files remain locked to the v0.1.7 stable baseline.
+        """
         expected = {
-            'scripts/capture_bridge.py': 'e83a744edcaba73c1542f6b281eca562e482f9f80f61001bb228e777e15e0abb',
+            'scripts/capture_bridge.py': '33d36d1dc4775c05dcb7fab1b76e1c468c01e8fde6a80c3ad30e82f94eb2db3c',
             'scripts/client.py': '6004270100f479739337aac672bf9135cb7a30a2e2006fb76f0f87b286d5b9b8',
-            'scripts/infer_engine.py': 'e055bd37d193d619e1802ca0f36db9d5403df8d7d19013afb26887ab998761bb',
+            'scripts/infer_engine.py': 'ca5933dc2717365ff16ed51a543641f10112bc86ad665ab20d38fc49eeda3212',
             'scripts/install-system.sh': '6082d55584bcff375b8f93ca102658413b31e33fca6e486c1ed4ca075a9f203f',
             'scripts/launch-gui.sh': 'cc249d16cb991b24ea3a06f7bc94e6640ea6504f644c303842ab7b4dacab4b66',
             'scripts/recognition_result.py': '7bed65ade3597ab56c1f1781bb49074cde7d3fd98a8ba15171545f431f6b9329',

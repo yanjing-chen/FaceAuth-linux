@@ -22,5 +22,13 @@ class InferTests(unittest.TestCase):
         import cv2
         bgr=cv2.cvtColor(gray,cv2.COLOR_GRAY2BGR)
         self.assertEqual(bgr.shape,(60,80,3))
+    def test_ir_enhance_lifts_dark_frame(self):
+        # 暗 IR 帧（含微弱人脸对比）经 CLAHE 后均值应提升，且尺寸不变
+        import cv2
+        dark=np.full((80,80),5,dtype=np.uint8)
+        dark[20:60,20:60]=25
+        enhanced=infer._enhance_ir(dark)
+        self.assertEqual(enhanced.shape,dark.shape)
+        self.assertGreater(float(enhanced.mean()),float(dark.mean()))
 
 if __name__ == '__main__':unittest.main()

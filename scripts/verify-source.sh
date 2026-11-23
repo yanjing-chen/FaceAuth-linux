@@ -4,9 +4,9 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$ROOT"
 echo "[1/3] Python unit tests"
-python3 -m unittest discover -s tests -q
+/usr/bin/python3 -m unittest discover -s tests -q
 echo "[2/3] Python syntax"
-python3 - <<'PYCODE'
+/usr/bin/python3 - <<'PYCODE'
 import pathlib, ast
 for f in list(pathlib.Path('scripts').glob('*.py')) + list(pathlib.Path('tests').glob('*.py')):
     ast.parse(f.read_text(encoding='utf-8'), filename=str(f))
