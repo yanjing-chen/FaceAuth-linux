@@ -769,29 +769,13 @@ class FaceAuthApp(Adw.Application):
             return
         embedding = response[3:].strip()
         self.progress.set_fraction(0.6)
-        self.status.set_label('采集完成，正在请求管理员授权以写入人脸…')
-        self._pending_enroll_embedding = embedding
-        # 授权在后台线程进行，polkit 弹框由 GNOME agent 显示，不阻塞 GTK 主线程。
-        def ask():
-            ok, msg = require_admin_auth()
-            GLib.idle_add(self._enroll_after_auth, ok, msg)
-        threading.Thread(target=ask, daemon=True, name='faceauth-auth').start()
-
-    def _enroll_after_auth(self, ok, msg):
-        if not ok:
-            self.set_busy(False)
-            self.progress.set_fraction(0)
-            self.status.set_label('人脸未写入：' + msg + '（采集的特征已丢弃）')
-            return
+        # 授权由 daemon 弹框并当场判定（GUI 不自己弹，避免两次查询不缓存导致失败）。
+        # 授权框由 GNOME 显示，GUI 仍是普通用户进程，取景框不受影响。
+        self.status.set_label('采集完成，等待管理员授权写入…（请在弹框中输入密码/指纹）')
         label = self.label_entry.get_text().strip()
-        embedding = getattr(self, '_pending_enroll_embedding', '')
-        if not embedding:
-            self.set_busy(False)
-            return
-        self.status.set_label('授权通过，正在写入人脸模板…')
         self.async_request(
             f'ENROLL_AS {self.user} {label} {embedding}',
-            self.enroll_done, timeout=12)
+            self.enroll_done, timeout=60)
 
     def enroll_done(self, response):
         self.set_busy(False)
@@ -962,19 +946,10 @@ class FaceAuthApp(Adw.Application):
     def delete_confirmed(self, result, label):
         if result != 'delete':
             return
-        self.status.set_label('正在请求管理员授权以保持人脸数据安全…')
-        def ask():
-            ok, msg = require_admin_auth()
-            GLib.idle_add(self._delete_after_auth, ok, msg, label)
-        threading.Thread(target=ask, daemon=True, name='faceauth-auth').start()
-
-    def _delete_after_auth(self, ok, msg, label):
-        if not ok:
-            self.status.set_label('删除未执行：' + msg)
-            self.settings_feedback.set_label('人脸管理：' + msg)
-            return
+        # 授权由 daemon 弹框判定，GUI 保持普通用户、不提权。
+        self.status.set_label('等待管理员授权删除人脸…（请在弹框中输入密码/指纹）')
         command = (f'DELETE_FACE {self.user} {label}' if label else f'DELETE {self.user}')
-        self.async_request(command, self.delete_done)
+        self.async_request(command, self.delete_done, timeout=60)
 
     def delete_done(self, response):
         denied = 'authorization' in (response or '').lower()

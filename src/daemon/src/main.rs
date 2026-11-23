@@ -1,7 +1,7 @@
 //! FaceAuth daemon: no desktop toolkit. Trusted Python camera+ML workers are children
 //! of this daemon, never injected into PAM. No PAM service is edited by this binary.
 use faceauth_core::{config::Config,peer,protocol,scene::{self,SceneManager},store::{Face,FaceStore},infer::Worker};
-use std::{env,fs,io::{self,Read,Write},os::unix::{fs::{PermissionsExt,MetadataExt,FileTypeExt},net::{UnixListener,UnixStream}},path::{Path,PathBuf},sync::{Arc,Mutex,atomic::{AtomicUsize,Ordering}},thread,time::{Duration,Instant},process::{Command,Stdio}};
+use std::{env,fs,io::{self,Write},os::unix::{fs::{PermissionsExt,MetadataExt,FileTypeExt},net::{UnixListener,UnixStream}},path::{Path,PathBuf},sync::{Arc,Mutex,atomic::{AtomicUsize,Ordering}},thread,time::{Duration,Instant},process::{Command,Stdio}};
 unsafe extern "C"{fn geteuid()->u32;}
 static SCENE_WRITE_LOCK: Mutex<()> = Mutex::new(());
 
@@ -228,21 +228,19 @@ fn authorize_action(rt:&Runtime, uid:u32, pid:i32, action:&str)->Result<(),Strin
     if uid==0{return Ok(());}
     let before=proc_starttime(pid)?;
     let identity=format!("{pid},{before},{uid}");
-    // 用 pkcheck 查询调用者是否已获授权。
-    // 关键：pkcheck 可能退出码 0 但 stdout 打印 `polkit.result=auth_admin`，
-    // 这表示"此动作需要管理员认证"而不是"已授权"。必须拒绝这种结果，
-    // 否则任何进程都能绕过授权（实测确认过这个坑）。
+    // 用 pkcheck 弹框认证并当场判定（与场景开关同一套、已实测可用）。
+    // --allow-user-interaction 会阻塞等待 GNOME polkit agent 弹框，
+    // 认证成功退出码 0、取消 3、失败非 0。授权与判定是同一次调用，
+    // 不依赖跨进程缓存（auth_admin 不缓存，分成 GUI 弹框+daemon 复查会失败）。
     let mut child=Command::new("/usr/bin/pkcheck")
-        .args(["--action-id",action, "--process",&identity])
-        .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null())
+        .args(["--action-id",action, "--process",&identity,"--allow-user-interaction"])
+        .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped())
         .spawn().map_err(|_|"polkit authorization unavailable".to_string())?;
-    let mut output=String::new();
-    if let Some(mut out)=child.stdout.take(){let _=out.read_to_string(&mut output);}
     let status=child.wait().map_err(|_|"polkit authorization failed".to_string())?;
-    let needs_auth=["auth_admin","auth_self","auth_admin_keep","auth_self_keep"]
-        .iter().any(|token|output.contains(token));
-    if !status.success()||needs_auth{
-        return Err("administrator authorization required but not granted".into());
+    let code=status.code().unwrap_or(-1);
+    if code!=0 {
+        let reason=if code==3{"authorization dialog dismissed"}else{"administrator authorization denied or unavailable"};
+        return Err(reason.into());
     }
     if proc_starttime(pid)?!=before{return Err("peer process identity changed".into());}
     Ok(())
