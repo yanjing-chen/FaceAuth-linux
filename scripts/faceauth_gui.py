@@ -543,11 +543,12 @@ class FaceAuthApp(Adw.Application):
             r.connect('notify::active', self.scene_toggled, name)
             scene_group.add(r)
             self.scene_rows[name] = r
-        # SSH 也是认证场景准入（远程会话禁止刷脸），归到本组；
-        # 它是本地保存的安全默认，无需管理员授权，不占 PAM 场景名额。
-        self.ssh_row = Adw.SwitchRow(title='SSH / 远程会话禁用刷脸',
-            subtitle='开启时：SSH 会话直接回退密码，不启动摄像头（安全默认，本地保存）')
-        self.ssh_row.set_active(self.cfg.get('ssh_disabled', '1') == '1')
+        # SSH 也是认证场景准入，归到本组。开关语义与其它场景一致：
+        # 开启=允许该场景刷脸，关闭=禁用。后端 ssh_disabled=1 表示禁用，
+        # 故此处做一次取反映射；默认禁用（安全），无需管理员授权。
+        self.ssh_row = Adw.SwitchRow(title='SSH / 远程会话',
+            subtitle='开启=允许 SSH 会话刷脸；关闭=SSH 直接回退密码、不启动摄像头（安全默认）')
+        self.ssh_row.set_active(self.cfg.get('ssh_disabled', '1') != '1')
         self.ssh_row.connect('notify::active', self.on_ssh_disabled)
         scene_group.add(self.ssh_row)
         account_column.append(scene_group)
@@ -711,8 +712,9 @@ class FaceAuthApp(Adw.Application):
         self.save_settings('暗 IR 帧跳过设置已保存')
 
     def on_ssh_disabled(self, row, _prop):
-        self.cfg['ssh_disabled'] = '1' if row.get_active() else '0'
-        self.save_settings('SSH 远程会话设置已保存；关闭后远程 SSH 中也会尝试刷脸')
+        # 与其它场景一致：开关开启=允许刷脸 -> ssh_disabled=0；关闭=禁用 -> 1。
+        self.cfg['ssh_disabled'] = '0' if row.get_active() else '1'
+        self.save_settings('SSH 远程会话设置已保存；开启时远程 SSH 也会尝试刷脸')
 
     def save_settings(self, note):
         try:
