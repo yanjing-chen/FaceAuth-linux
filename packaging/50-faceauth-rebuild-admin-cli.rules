@@ -1,0 +1,9 @@
+// Allow pkexec to run the FaceAuth admin CLI after authenticating with the
+// FaceAuth manage-models action (administrator password / fingerprint),
+// instead of requiring the (usually locked) root password.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        action.lookup("program") == "/usr/bin/faceauth-rebuild-cli") {
+        return polkit.Result.AUTH_ADMIN;
+    }
+});

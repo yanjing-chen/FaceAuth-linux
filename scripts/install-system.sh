@@ -15,7 +15,7 @@ done
 if [[ -e /etc/systemd/system/faceauth-rebuild.service ]]; then
     echo '已有 faceauth-rebuild.service；请先检查是否由本项目安装，禁止盲目覆盖。' >&2;exit 1
 fi
-install -d -o root -g root -m 0755 /usr/libexec/faceauth-rebuild/scripts /usr/lib/faceauth-rebuild /usr/share/polkit-1/actions
+install -d -o root -g root -m 0755 /usr/libexec/faceauth-rebuild/scripts /usr/lib/faceauth-rebuild /usr/share/polkit-1/actions /usr/share/polkit-1/rules.d
 install -d -o root -g root -m 0700 /var/lib/faceauth-rebuild /var/lib/faceauth-rebuild/models /var/lib/faceauth-rebuild/backups
 install -o root -g root -m 0755 target/release/faceauth-daemon /usr/libexec/faceauth-rebuild/faceauth-daemon
 install -o root -g root -m 0755 target/release/faceauth-cli /usr/bin/faceauth-rebuild-cli
@@ -31,6 +31,7 @@ for f in assets/models/*.onnx; do
 done
 install -o root -g root -m 0644 packaging/org.faceauth.rebuild.manage-scenes.policy /usr/share/polkit-1/actions/
 install -o root -g root -m 0644 packaging/org.faceauth.rebuild.manage-models.policy /usr/share/polkit-1/actions/
+install -o root -g root -m 0644 packaging/50-faceauth-rebuild-admin-cli.rules /usr/share/polkit-1/rules.d/
 install -o root -g root -m 0644 packaging/faceauth-rebuild.service /etc/systemd/system/
 # This explicit test profile is not used by GDM/sudo/polkit.
 if [[ ! -e /etc/pam.d/faceauth-rebuild-test ]]; then

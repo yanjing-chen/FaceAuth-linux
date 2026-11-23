@@ -25,7 +25,7 @@ from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 
 from client import (request, current_socket, load_config, save_config,
                     migrate_obsolete_settings, list_video_devices,
-                    short_device_label, valid_label, require_admin_auth)
+                    short_device_label, valid_label, admin_request)
 from recognition_result import interpret_test_reply
 
 MODES = [('rgb', '单 RGB（彩色）'), ('ir', '单 IR（红外）'), ('dual', '双模 RGB + IR')]
@@ -769,13 +769,14 @@ class FaceAuthApp(Adw.Application):
             return
         embedding = response[3:].strip()
         self.progress.set_fraction(0.6)
-        # 授权由 daemon 弹框并当场判定（GUI 不自己弹，避免两次查询不缓存导致失败）。
-        # 授权框由 GNOME 显示，GUI 仍是普通用户进程，取景框不受影响。
+        # 用 pkexec 在后台线程完成授权+写入：pkexec 从 GUI 进程发起、继承图形会话
+        # 所以能弹授权框；GUI 本身不提权，取景框不受影响。
         self.status.set_label('采集完成，等待管理员授权写入…（请在弹框中输入密码/指纹）')
         label = self.label_entry.get_text().strip()
-        self.async_request(
-            f'ENROLL_AS {self.user} {label} {embedding}',
-            self.enroll_done, timeout=60)
+        def commit():
+            reply = admin_request(f'ENROLL_AS {self.user} {label} {embedding}')
+            GLib.idle_add(self.enroll_done, reply)
+        threading.Thread(target=commit, daemon=True, name='faceauth-admin-write').start()
 
     def enroll_done(self, response):
         self.set_busy(False)
@@ -946,10 +947,13 @@ class FaceAuthApp(Adw.Application):
     def delete_confirmed(self, result, label):
         if result != 'delete':
             return
-        # 授权由 daemon 弹框判定，GUI 保持普通用户、不提权。
+        # 用 pkexec 弹授权框并以 root 执行删除；GUI 本身不提权、取景框不受影响。
         self.status.set_label('等待管理员授权删除人脸…（请在弹框中输入密码/指纹）')
         command = (f'DELETE_FACE {self.user} {label}' if label else f'DELETE {self.user}')
-        self.async_request(command, self.delete_done, timeout=60)
+        def commit():
+            reply = admin_request(command)
+            GLib.idle_add(self.delete_done, reply)
+        threading.Thread(target=commit, daemon=True, name='faceauth-admin-delete').start()
 
     def delete_done(self, response):
         denied = 'authorization' in (response or '').lower()

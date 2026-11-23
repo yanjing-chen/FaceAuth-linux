@@ -260,7 +260,10 @@ fn handle(rt:&Runtime,pipe:&Mutex<Pipeline>,uid:u32,pid:i32,input:&str)->String 
     let user=p[1];
     let auth=p[0]=="AUTH";
     if auth {if uid!=0{return "ERR root-only AUTH".into();}}
-    else if !(is_self(uid,user)||(uid==0 && matches!(p[0],"SCENE_ON"|"SCENE_OFF"|"SCENE_LIST"))) {
+    // root 可信：pkexec 授权的临时 CLI 以 uid 0 连接，允许其执行写入命令。
+    // 授权已由 pkexec 在图形会话中弹框完成，daemon 不再二次弹框。
+    else if !(is_self(uid,user)||(uid==0 && matches!(
+        p[0],"SCENE_ON"|"SCENE_OFF"|"SCENE_LIST"|"ENROLL"|"ENROLL_AS"|"DELETE"|"DELETE_FACE"))) {
         return "ERR peer uid mismatch".into();
     }
     if peer::user_uid(user).is_none(){return "ERR invalid user".into();}

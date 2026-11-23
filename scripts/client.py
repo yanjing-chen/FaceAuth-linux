@@ -49,39 +49,37 @@ def valid_label(label):
 MODEL_AUTH_ACTION = 'org.faceauth.rebuild.manage-models'
 
 
-def require_admin_auth(timeout=60):
-    """Trigger the polkit agent to ask for administrator authorization.
-    Returns (ok, message). This process stays unprivileged: pkcheck only asks
-    polkit to authenticate the current user via the GNOME agent; it does NOT
-    raise our GUI's privileges, so Wayland environment and camera preview stay
-    intact. The daemon independently verifies the same authorization.
+ADMIN_CLI = '/usr/bin/faceauth-rebuild-cli'
+
+
+def admin_request(line, timeout=90):
+    """Run a privileged daemon command through pkexec.
+    pkexec is launched from the GUI process, so it inherits the user's
+    graphical session and the GNOME polkit agent can prompt for password /
+    fingerprint. The GUI itself stays unprivileged: its Wayland environment
+    and camera preview are untouched (no white-frame regression).
+    Returns the daemon reply string, or an ERR line on denial/failure.
     """
+    import subprocess
+    if any(c in line for c in ('\n', '\r')) or len(line) > 6000:
+        return 'ERR invalid admin command'
     try:
-        import subprocess
-        # polkit requires pid,start-time,uid (bare pid is racy/rejected).
-        pid = os.getpid()
-        raw = open(f'/proc/{pid}/stat', encoding='utf-8').read()
-        starttime = raw[raw.rfind(')') + 1:].split()[19]
-        subject = f'{pid},{starttime},{os.getuid()}'
         proc = subprocess.run(
-            ['/usr/bin/pkcheck', '--action-id', MODEL_AUTH_ACTION,
-             '--process', subject, '--allow-user-interaction'],
+            ['/usr/bin/pkexec', ADMIN_CLI, line],
             capture_output=True, text=True, timeout=timeout)
     except FileNotFoundError:
-        return False, 'polkit 工具不可用'
+        return 'ERR pkexec or CLI unavailable'
     except subprocess.TimeoutExpired:
-        return False, '授权请求超时'
+        return 'ERR authorization or command timed out'
     except Exception as exc:
-        return False, f'授权请求失败：{exc}'
-    # pkcheck exit 0 with 'polkit.result=auth_admin' means auth is required
-    # but was not interactively granted; treat as denied.
-    out = (proc.stdout or '') + (proc.stderr or '')
-    needs = any(t in out for t in ('auth_admin', 'auth_self'))
-    if proc.returncode == 0 and not needs:
-        return True, 'ok'
-    if 'dismissed' in out.lower() or proc.returncode == 3:
-        return False, '已取消管理员授权'
-    return False, '未通过管理员授权（需要输入密码或指纹）'
+        return f'ERR {type(exc).__name__}'
+    out = (proc.stdout or '').strip().splitlines()
+    reply = out[0] if out else ''
+    if proc.returncode != 0:
+        err = (proc.stderr or '').strip().splitlines()
+        detail = err[-1] if err else 'authorization denied'
+        return f'ERR {detail[:120]}'
+    return reply or 'ERR empty reply'
 
 
 def load_config():

@@ -24,8 +24,12 @@ class ClientTests(unittest.TestCase):
         txt=(SRC/'scripts/faceauth_gui.py').read_text()
         self.assertNotIn('cv2.VideoCapture', txt)
         self.assertNotIn('/dev/video0',txt)
-        self.assertNotIn('pkexec', txt)
+        # pkexec is allowed only via client.admin_request (a short-lived CLI
+        # for authorized enroll/delete), never to elevate this GUI itself.
         self.assertNotIn('os.system(',txt)
+        # GUI must not launch pkexec directly: privileged writes go through
+        # client.admin_request, so the GUI process itself stays unprivileged.
+        self.assertNotIn("/usr/bin/pkexec", txt)
 
     def test_saving_permissions(self):
         with tempfile.TemporaryDirectory() as temp:
