@@ -30,8 +30,6 @@ from recognition_result import interpret_test_reply
 
 MODES = [('rgb', '单 RGB（彩色）'), ('ir', '单 IR（红外）'), ('dual', '双模 RGB + IR')]
 LIVENESS = [('none', '无活体（存在风险）'), ('heuristic', 'IR / 图像启发式（有限防伪）')]
-# 相似度阈值档位：与工作模式/活体复用同一个 ReadableChoiceRow，风格一致。
-THRESHOLDS = [('0.45', '宽松（0.45）'), ('0.6', '标准（0.60）'), ('0.75', '严格（0.75）')]
 # 认证帧数档位：帧数越多越稳，但认证耗时略增（PAM 5 秒超时上限）。
 AUTH_FRAMES = [('1', '快速（1 帧）'), ('3', '均衡（3 帧）'), ('5', '稳健（5 帧）')]
 SCENES = [('sudo', 'sudo 提权'), ('gdm', 'GDM 登录 / 锁屏'),
@@ -437,13 +435,23 @@ class FaceAuthApp(Adw.Application):
             selected=next((i for i, (key, _) in enumerate(LIVENESS) if key == self.cfg['liveness']), 1),
             on_change=self.change_liveness, compact=True)
         group.add(self.live_row)
-        self.threshold_row = ReadableChoiceRow('识别灵敏度', [
-            (THRESHOLDS[0][1], '阈值 0.45：更容易通过，但安全性降低（误接受风险升高）', '宽松 0.45'),
-            (THRESHOLDS[1][1], '阈值 0.60：推荐默认值，兼顾通过率与安全性', '标准 0.60'),
-            (THRESHOLDS[2][1], '阈值 0.75：更安全，但可能需要重新录入或多次尝试', '严格 0.75')],
-            selected=next((i for i, (key, _) in enumerate(THRESHOLDS)
-                           if abs(float(key) - float(self.cfg.get('threshold', 0.6))) < 0.001), 1),
-            on_change=self.change_threshold, compact=True)
+        # 识别灵敏度：数值框 + 上下小按钮，可在 0.30~0.95 间以 0.01 精细调节。
+        # Adw.SpinRow 是 ActionRow 子类，放进 PreferencesGroup 与其余行风格一致。
+        self._threshold_init = True
+        try:
+            initial_threshold = float(self.cfg.get('threshold', 0.6))
+        except (TypeError, ValueError):
+            initial_threshold = 0.6
+        initial_threshold = min(0.95, max(0.30, initial_threshold))
+        self.threshold_row = Adw.SpinRow(
+            title='识别灵敏度（阈值）',
+            subtitle='数值越小越易通过、越大越安全；可用上下按钮以 0.01 微调')
+        self.threshold_row.set_adjustment(Gtk.Adjustment.new(
+            initial_threshold, 0.30, 0.95, 0.01, 0.05, 0.0))
+        self.threshold_row.set_digits(2)
+        self.threshold_row.set_numeric(True)
+        self.threshold_row.connect('notify::value', self.change_threshold)
+        self._threshold_init = False
         group.add(self.threshold_row)
         hardware_column.append(group)
 
@@ -637,8 +645,11 @@ class FaceAuthApp(Adw.Application):
         self.cfg['liveness'] = LIVENESS[row.get_selected()][0]
         self.save_settings('活体设置已保存；启发式检查不等同安全认证')
 
-    def change_threshold(self, row, _spec):
-        self.cfg['threshold'] = THRESHOLDS[row.get_selected()][0]
+    def change_threshold(self, row, _prop):
+        if getattr(self, '_threshold_init', False):
+            return
+        value = min(0.95, max(0.30, row.get_value()))
+        self.cfg['threshold'] = f'{value:.2f}'
         self.save_settings('识别灵敏度已保存；调低更易通过但安全性下降，请重新做识别测试')
 
     def change_auth_frames(self, row, _spec):
