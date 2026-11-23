@@ -752,23 +752,46 @@ class FaceAuthApp(Adw.Application):
             self.status.set_label('名称不得包含空格、逗号、斜杠，UTF-8 总长度不超过 64 字节')
             return
         self.set_busy(True)
-        self.status.set_label('正在请求管理员授权…（GUI 保持普通用户，不会白屏）')
-        # 授权在后台线程进行，避免阻塞 GTK 主线程导致预览冻结；
-        # polkit 弹框由 GNOME agent 显示，GUI 环境变量不变。
-        def ask():
-            ok, msg = require_admin_auth()
-            GLib.idle_add(self._enroll_after_auth, ok, msg, label)
-        threading.Thread(target=ask, daemon=True, name='faceauth-auth').start()
-
-    def _enroll_after_auth(self, ok, msg, label):
-        if not ok:
-            self.set_busy(False)
-            self.status.set_label('录入未开始：' + msg)
-            return
         self.preview.pause()  # stop new preview polls before exclusive capture
         self.progress.set_fraction(0)
-        self.status.set_label('授权通过，正在采集 5 帧并进行活体检测，请正视摄像头…')
-        self.async_request(f'ENROLL_CAPTURE {self.user} {label}', self.enroll_done, timeout=28)
+        # 先采集 5 帧（不弹授权框，避免 GNOME 模态框抢焦点导致采帧失败），
+        # 采集成功后才请求管理员授权，授权通过再写入模板。
+        self.status.set_label('正在采集 5 帧并进行活体检测，请正视摄像头…')
+        self.async_request(f'ENROLL_CAPTURE {self.user} {label}', self.enroll_captured, timeout=28)
+
+    def enroll_captured(self, response):
+        # 采集阶段结束：恢复预览；此时特征只在内存，尚未写入模板。
+        self.resume_continuous_preview()
+        if not response.startswith('OK '):
+            self.set_busy(False)
+            self.progress.set_fraction(0)
+            self.status.set_label('采集失败：' + response)
+            return
+        embedding = response[3:].strip()
+        self.progress.set_fraction(0.6)
+        self.status.set_label('采集完成，正在请求管理员授权以写入人脸…')
+        self._pending_enroll_embedding = embedding
+        # 授权在后台线程进行，polkit 弹框由 GNOME agent 显示，不阻塞 GTK 主线程。
+        def ask():
+            ok, msg = require_admin_auth()
+            GLib.idle_add(self._enroll_after_auth, ok, msg)
+        threading.Thread(target=ask, daemon=True, name='faceauth-auth').start()
+
+    def _enroll_after_auth(self, ok, msg):
+        if not ok:
+            self.set_busy(False)
+            self.progress.set_fraction(0)
+            self.status.set_label('人脸未写入：' + msg + '（采集的特征已丢弃）')
+            return
+        label = self.label_entry.get_text().strip()
+        embedding = getattr(self, '_pending_enroll_embedding', '')
+        if not embedding:
+            self.set_busy(False)
+            return
+        self.status.set_label('授权通过，正在写入人脸模板…')
+        self.async_request(
+            f'ENROLL_AS {self.user} {label} {embedding}',
+            self.enroll_done, timeout=12)
 
     def enroll_done(self, response):
         self.set_busy(False)
@@ -780,7 +803,7 @@ class FaceAuthApp(Adw.Application):
         dialog = Adw.AlertDialog()
         dialog.set_heading('录入成功' if ok else ('管理员授权未通过' if denied else '录入未完成'))
         dialog.set_body(
-            '本次录入需要管理员授权；已取消或未通过授权，未写入任何人脸数据。' if denied
+            '人脸已采集但未授权写入，特征已丢弃。' if denied
             else (response if response else ('已完成 5 帧采集并写入模板。' if ok else '请检查摄像头、IR 与人脸位置后重试。')))
         dialog.add_response('close', '关闭')
         dialog.set_default_response('close')

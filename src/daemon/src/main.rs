@@ -338,8 +338,9 @@ fn handle(rt:&Runtime,pipe:&Mutex<Pipeline>,uid:u32,pid:i32,input:&str)->String 
         },
         "ENROLL_CAPTURE" if p.len()==3=>{
             if protocol::normalize_label(p[2]).is_none(){return "ERR invalid label".into();}
-            // 授权必须在采帧之前：取消授权则完全不碰摄像头、不写入模板。
-            if let Err(e)=authorize_models(rt,uid,pid){return format!("ERR {e}");}
+            // 只采集特征、不写模板、不弹授权：GNOME 的 polkit 授权框是模态窗口，
+            // 会抢走输入焦点导致采帧失败。授权改在写入(ENROLL_AS)时进行。
+            // 采集结果仅在内存中，未授权不会落盘。
             let cfg=match system_config(rt,user){Ok(c)=>c,Err(_)=>return "ERR configure a camera first".into()};
             let face=match pipe.lock(){
                 Ok(mut x)=>{
@@ -355,11 +356,8 @@ fn handle(rt:&Runtime,pipe:&Mutex<Pipeline>,uid:u32,pid:i32,input:&str)->String 
                 },
                 Err(_)=>Err("worker lock".into())
             };
-            match face{Ok(e)=>{
-                let mut st=match FaceStore::load(&path){Ok(s)=>s,Err(_)=>return "ERR existing template damaged".into()};
-                if st.put(Face{label:p[2].into(),embedding:e}).is_err(){return "ERR face limit reached".into();}
-                match st.save(&path){Ok(_)=>format!("OK enrolled:{}",p[2]),Err(_)=>"ERR store failed".into()}
-            },Err(_)=>"ERR face capture failed; check camera/IR/model".into()}
+            match face{Ok(e)=>format!("OK {}",protocol::encode_embedding(&e)),
+                Err(_)=>"ERR face capture failed; check camera/IR/model".into()}
         },
         "AUTH"|"TEST" if p.len()==2=>{
             let cfg=match system_config(rt,user){Ok(c)=>c,Err(_)=>return "IGNORE no-config".into()};
