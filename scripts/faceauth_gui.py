@@ -936,9 +936,9 @@ class FaceAuthApp(Adw.Application):
     def confirm_delete(self, label):
         dialog = Adw.AlertDialog()
         dialog.set_heading(f'确认删除「{label}」？' if label else '确认删除全部人脸？')
-        dialog.set_body('删除不可撤销。其它系统密码与指纹设置不会受到影响。')
+        dialog.set_body('删除不可撤销。下一步需要现场刷脸验证本人身份（含活体检查），验证通过才会删除。')
         dialog.add_response('cancel', '取消')
-        dialog.add_response('delete', '删除')
+        dialog.add_response('delete', '下一步：刷脸验证')
         dialog.set_response_appearance('delete', Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response('cancel')
         dialog.set_close_response('cancel')
@@ -947,13 +947,45 @@ class FaceAuthApp(Adw.Application):
     def delete_confirmed(self, result, label):
         if result != 'delete':
             return
-        # 用 pkexec 弹授权框并以 root 执行删除；GUI 本身不提权、取景框不受影响。
-        self.status.set_label('等待管理员授权删除人脸…（请在弹框中输入密码/指纹）')
+        # 第一道关：现场刷脸验证（含活体），必须是本人才继续。
+        # 这一步只依赖已录入的模板，别人在会话里没有你的脸就过不去。
+        self._pending_delete_label = label
+        self._deleting = True
+        self.status.set_label('删除前验证：请正视摄像头完成刷脸（含活体检查）…')
+        self.preview.pause()
+        self.async_request(f'TEST {self.user}', self.delete_face_verified, timeout=30)
+
+    def delete_face_verified(self, response):
+        self.resume_continuous_preview()
+        if not self._deleting:
+            return
+        if not response.startswith('OK ') or 'accepted' not in response:
+            self._deleting = False
+            self.status.set_label('刷脸验证未通过，人脸未被删除。' + response)
+            dlg = Adw.AlertDialog()
+            dlg.set_heading('删除已取消')
+            dlg.set_body('现场刷脸验证未通过（或识别暂不可用），没有删除任何人脸。')
+            dlg.add_response('close', '关闭')
+            dlg.set_default_response('close')
+            dlg.set_close_response('close')
+            dlg.present(self.win)
+            return
+        # 刷脸通过：第二道关用 pkexec 以 root 写入（GUI 不提权）。
+        label = self._pending_delete_label
+        self.status.set_label('刷脸验证通过，正在执行删除…')
         command = (f'DELETE_FACE {self.user} {label}' if label else f'DELETE {self.user}')
         def commit():
             reply = admin_request(command)
             GLib.idle_add(self.delete_done, reply)
         threading.Thread(target=commit, daemon=True, name='faceauth-admin-delete').start()
+
+    def delete_done(self, response):
+        self._deleting = False
+        denied = 'authorization' in (response or '').lower()
+        note = ('管理员授权未通过，人脸未被删除。' if denied else response)
+        self.status.set_label(note)
+        self.settings_feedback.set_label('人脸管理：' + note)
+        self.refresh_lists()
 
     def delete_done(self, response):
         denied = 'authorization' in (response or '').lower()
