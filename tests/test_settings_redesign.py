@@ -45,8 +45,8 @@ class SettingsRedesignTests(unittest.TestCase):
         All other files remain locked to the v0.1.7 stable baseline.
         """
         expected = {
-            'scripts/capture_bridge.py': 'a42e31330a8b642eeca1d7596b20cc39b2eee38149275f26d9594edaf55de02f',
-            'scripts/client.py': '53b5d30957e1f3973de065d71403819d3ba81e69c0442174c2e1544a64a0ab81',
+            'scripts/capture_bridge.py': '8bcb75e34cfb4d2ad773ddcc83e11d982acccfbdde500794545d916206b79d32',
+            'scripts/client.py': 'cb38d0605fa009cbba5c47c382a2aba74cf1e4fa2230d31169246650d7995b61',
             'scripts/infer_engine.py': 'ca5933dc2717365ff16ed51a543641f10112bc86ad665ab20d38fc49eeda3212',
             'scripts/install-system.sh': '3dd2711f7cffb7998cd3785663be783ef1fcc23d43229eca22b7224ec692e143',
             'scripts/launch-gui.sh': 'cc249d16cb991b24ea3a06f7bc94e6640ea6504f644c303842ab7b4dacab4b66',

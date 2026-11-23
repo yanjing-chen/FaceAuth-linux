@@ -189,7 +189,14 @@ def is_video_capture_node(device_path):
 
 
 def list_video_devices():
-    paths = {}
+    # 优先 by-path：它以 USB 接口号命名（…:1.0=彩色、…:1.2=IR），重启后
+    # 与物理接口绑定、名字准确。by-id 的 "HD_Webcam" 名字可能挂在 IR 节点上，
+    # 曾导致把 IR 当 RGB 配置、识别失败。故同一 videoN 只保留最优符号链接。
+    def path_rank(p):
+        if '/by-path/' in p: return 0
+        if '/by-id/' in p: return 1
+        return 2  # 裸 /dev/videoN 最不稳定
+    candidates = {}
     patterns = ('/dev/v4l/by-id/*', '/dev/v4l/by-path/*', '/dev/video[0-9]*')
     for pattern in patterns:
         for p in sorted(glob.glob(pattern)):
@@ -201,8 +208,10 @@ def list_video_devices():
                     continue
             except OSError:
                 continue
-            # Prioritize stable symlinks and dedupe by resolved video node.
-            paths.setdefault(real, p)
+            prev = candidates.get(real)
+            if prev is None or path_rank(p) < path_rank(prev):
+                candidates[real] = p
+    paths = candidates
     visible = []
     for real, path in sorted(paths.items(), key=lambda kv: int(kv[0].removeprefix('/dev/video'))):
         capture = is_video_capture_node(real)

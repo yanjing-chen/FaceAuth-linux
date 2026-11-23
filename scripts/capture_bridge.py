@@ -64,6 +64,26 @@ def open_cap(path):
     return cap
 
 
+def device_is_ir(path):
+    """Read kernel sysfs name to tell an IR sensor from a color camera.
+    Returns True/False, or None when the name is unavailable/inconclusive.
+    This prevents an IR node (misleadingly symlinked under by-id 'HD_Webcam')
+    from being used as the RGB recognition source after a reboot.
+    """
+    try:
+        real = os.path.realpath(path)
+        if not re.fullmatch(r'/dev/video\d+', real):
+            return None
+        name = (Path('/sys/class/video4linux') / Path(real).name / 'name').read_text().strip()
+        if re.search(r'(?i)(infrared|ir camera|\bir\b)', name):
+            return True
+        if re.search(r'(?i)(color|colour|\brgb\b|webcam)', name):
+            return False
+        return None
+    except (OSError, ValueError):
+        return None
+
+
 def _same_camera(cap_a, cap_b):
     """Rough check that two opened streams are not the same physical camera.
     Different resolutions => definitely different. Same resolution => compare
@@ -215,6 +235,17 @@ def main():
                         if not ir_path: raise ValueError('IR device not configured')
                         if os.path.realpath(rgb_path) == os.path.realpath(ir_path):
                             raise ValueError('dual mode needs two distinct video nodes')
+                        # 角色校验：若 RGB 通道其实是 IR 传感器（重启后符号链接漂移
+                        # 曾出现 by-id 'HD_Webcam' 指向 IR 节点），拒绝本次 OPEN，
+                        # 让 daemon 回退密码，而不是拿 IR 帧去匹配 RGB 模板导致解锁失败。
+                        rgb_is_ir = device_is_ir(rgb_path)
+                        ir_is_ir = device_is_ir(ir_path)
+                        if rgb_is_ir is True:
+                            if rgb is not None: rgb.release()
+                            raise ValueError('RGB device is an IR camera')
+                        if ir_is_ir is False and rgb_is_ir is None:
+                            if rgb is not None: rgb.release()
+                            raise ValueError('IR device is not an IR camera')
                         ir = open_cap(ir_path)
                         # 深度校验：即使路径字符串不同，也要确认打开后是两个不同画面源。
                         # 重启后若两个稳定路径被解析到同一节点，这里会拒绝 OPEN，

@@ -51,7 +51,9 @@ class V4L2QuerycapTests(unittest.TestCase):
             patch.object(mod,'video_node_name',return_value='Some USB Webcam'):
             results=mod.list_video_devices()
         self.assertEqual(len(results),2)
-        self.assertEqual(results[0][0],'/dev/v4l/by-id/rgb')
+        # by-path preferred: interface-numbered names stay correct across reboots,
+        # while by-id's 'HD_Webcam' label may be attached to the IR node.
+        self.assertEqual(results[0][0],'/dev/v4l/by-path/rgb')
         self.assertEqual(results[1][0],'/dev/video2')
         self.assertEqual(cap.call_count,4)
 
