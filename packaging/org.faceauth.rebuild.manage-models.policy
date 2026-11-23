@@ -9,7 +9,10 @@
     <message xml:lang="zh_CN">添加或删除人脸识别数据需要管理员认证，以防止他人在当前会话中偷偷登记或删除人脸。</message>
     <defaults>
       <allow_any>no</allow_any>
-      <allow_inactive>no</allow_inactive>
+      <!-- 允许非活动会话弹框认证：本机会话被 polkit 标为 inactive，
+           若设为 no 会直接拒绝且不弹授权框，用户根本没有输密码的机会。
+           仍然要求管理员密码，安全性不降低。 -->
+      <allow_inactive>auth_admin</allow_inactive>
       <allow_active>auth_admin</allow_active>
     </defaults>
   </action>
