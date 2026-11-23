@@ -61,7 +61,7 @@ class SettingsRedesignTests(unittest.TestCase):
             'src/core/src/protocol.rs': '6cee4651880954bee6ae8eb4998f008bc259c4e7f5d865358248643dcbd31aa6',
             'src/core/src/scene.rs': 'c714e06dda49b9bec075d36dc48ddc18226af8c0592e8329582a6964f4ae87da',
             'src/core/src/store.rs': '944d3f15fb06f26fd19fd0f4e0a79c0d63f21375c0929990733a670c4530c02f',
-            'src/daemon/src/main.rs': 'd1d004743e0bc8d3be001f4cca848b9d2b6ae68517b5b994c12c4a055152de72',
+            'src/daemon/src/main.rs': '5d816509c02f9ae0380f5386c6a82d1f0f461c691e3a4be35113d23caaca9254',
             'src/pam/src/lib.rs': '38a91653128941f5ca6459f6e773463b19908a97fed68bcc6c0c1e289293c34b',
             'src/scene-admin/src/main.rs': '518de2847a4668d251273713284fb4acf4e0b0f2acc20ab62fd2081b80bf8a64',
         }

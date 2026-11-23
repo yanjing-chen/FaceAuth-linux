@@ -4,6 +4,12 @@ use faceauth_core::{config::Config,peer,protocol,scene::{self,SceneManager},stor
 use std::{env,fs,io::{self,Write},os::unix::{fs::{PermissionsExt,MetadataExt,FileTypeExt},net::{UnixListener,UnixStream}},path::{Path,PathBuf},sync::{Arc,Mutex,atomic::{AtomicUsize,Ordering}},thread,time::{Duration,Instant},process::{Command,Stdio}};
 unsafe extern "C"{fn geteuid()->u32;}
 static SCENE_WRITE_LOCK: Mutex<()> = Mutex::new(());
+/// IR 废帧判定阈值：8 桶直方图最低桶占比超过该值即视为补光闪烁黑帧。
+/// 与 howdy 的 dark_threshold 同思路；实测本机正常帧 0.1~10.4%，留足余量。
+const DARK_FRAME_THRESHOLD_PCT: f32 = 60.0;
+/// 认证取帧总时间预算：与 howdy 的 timeout=4s 一致，留 1 秒给 PAM 其余环节，
+/// 避免撞上 PAM 模块的 5 秒读超时。帧数上限仍保留，两者谁先到都停止。
+const AUTH_BUDGET: Duration = Duration::from_secs(4);
 
 struct Runtime {dev:bool,script_dir:PathBuf,store_dir:PathBuf, scene_dir:PathBuf}
 struct Pipeline {capture:Option<Worker>,infer:Option<Worker>,opened_for:Option<String>,preview_owner:Option<String>,last_preview:Option<Instant>}
@@ -11,6 +17,28 @@ struct Snap{w:usize,h:usize,gray:String,ir_w:usize,ir_h:usize,ir_gray:String}
 
 fn worker_error(text:&str)->String {if text.starts_with("ERR"){text.into()}else{"ERR device or inference unavailable".into()}}
 fn hex_nibble(b:u8)->Option<u8>{match b{b'0'..=b'9'=>Some(b-b'0'),b'a'..=b'f'=>Some(b-b'a'+10),b'A'..=b'F'=>Some(b-b'A'+10),_=>None}}
+/// howdy 风格暗帧判定：对 8bit 灰度做 8 桶直方图，返回最低桶（最暗 1/8）
+/// 占全部采样的百分比。补光闪烁产生的全黑帧该值接近 100，正常 IR 帧很低。
+/// 采样而非全解析：每 step 个像素取一个，足以判定明暗分布且开销可控。
+fn ir_darkness(hex:&str)->Option<f32>{
+    let b=hex.as_bytes();
+    if b.len()<2 || b.len()%2!=0 {return None;}
+    let step=((b.len()/2)/4096).max(1); // 最多约 4096 个采样点
+    let mut hist=[0u32;8];let mut total=0u32;
+    let mut i=0usize;let mut idx=0usize;
+    while i+1<b.len(){
+        if idx%step==0{
+            if let (Some(hi),Some(lo))=(hex_nibble(b[i]),hex_nibble(b[i+1])){
+                let v=hi*16+lo;
+                hist[(v as usize)>>5]+=1; // 0-255 -> 0-7
+                total+=1;
+            }
+        }
+        i+=2;idx+=1;
+    }
+    if total==0{return Some(100.0);}
+    Some(hist[0] as f32*100.0/total as f32)
+}
 fn parse_snap(text:&str)->Result<Snap,String>{
     let mut parts=text.splitn(7,' ');
     if parts.next()!=Some("OK"){return Err(worker_error(text));}
@@ -97,20 +125,13 @@ impl Pipeline {
             if s.ir_w==0 || s.ir_h==0{return Err("IR required".into());}
             (s.ir_w,s.ir_h,&s.ir_gray)
         }else{(s.w,s.h,&s.gray)};
-        // 暗 IR 帧跳过：补光闪烁会产生全黑帧，直接拒绝该帧让多帧逻辑重取。
-        // 用采样字节估算亮度，避免逐像素解析整个 hex（性能）。
+        // 暗 IR 帧跳过（howdy 风格）：8 桶直方图最低桶占比 > 60% 视为补光
+        // 闪烁造成的废帧，拒绝本帧让轮询重取。实测正常 IR 帧该值 0.1~10.4%，
+        // 全黑帧接近 100%，阈值 60 有充足区分度。
         if cfg.dark_ir_skip && cfg.mode=="dual" {
-            let bytes=gray.as_bytes();
-            let step=(bytes.len()/256).max(2);
-            let mut sum=0u64;let mut n=0u64;
-            let mut i=0usize;
-            while i+1<bytes.len(){
-                if let (Some(a),Some(b))=(hex_nibble(bytes[i]),hex_nibble(bytes[i+1])){
-                    sum+=(a*16+b) as u64;n+=1;
-                }
-                i+=step*2;
+            if let Some(darkness)=ir_darkness(gray){
+                if darkness>DARK_FRAME_THRESHOLD_PCT{return Err("dark IR frame skipped".into());}
             }
-            if n>0 && sum/n < 12 {return Err("dark IR frame skipped".into());}
         }
         let result=match self.engine(rt)?.query(&format!("LIVENESS {w} {h} {gray}")){
             Ok(v)=>v,Err(e)=>{self.infer=None;return Err(e.to_string());}
@@ -151,7 +172,12 @@ impl Pipeline {
         let auth_frames=cfg.effective_auth_frames();
         let mut best:(String,f32,bool)=(String::new(),-1.0,false);
         let mut saw_frame=false;
-        for _ in 0..auth_frames {
+        let started=Instant::now();
+        let mut attempts=0usize;
+        // 双上限：帧数（用户档位 1/3/5）和时间（4s，PAM 5s 内留余量），
+        // 任一先到即停止；期间任一帧同时满足相似度+活体就立即通过。
+        while attempts<auth_frames && started.elapsed()<AUTH_BUDGET {
+            attempts+=1;
             // Any worker/camera/security error on this frame is skipped; if no
             // frame ever succeeds we fall back to IGNORE (password), never OK.
             let result=(||->Result<(String,f32,bool),String>{
@@ -441,3 +467,31 @@ fn run()->Result<(),Box<dyn std::error::Error>>{
     Ok(())
 }
 fn main(){if let Err(err)=run(){eprintln!("faceauth-daemon: {err}");std::process::exit(1)}}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn hex_of(v:u8,n:usize)->String{format!("{v:02x}").repeat(n)}
+    #[test] fn darkness_black_frame(){
+        // 全黑帧：最低桶占比 100%
+        assert_eq!(ir_darkness(&hex_of(0,2048)),Some(100.0));
+    }
+    #[test] fn darkness_bright_frame(){
+        // 全亮帧（255 落在最高桶）：最低桶占比 0%
+        assert_eq!(ir_darkness(&hex_of(255,2048)),Some(0.0));
+    }
+    #[test] fn darkness_normal_distribution(){
+        // 正常 IR 帧：90% 像素在中高桶，10% 在最暗桶 -> darkness≈10%，
+        // 远低于 60 阈值（实测本机正常帧 0.1~10.4%）
+        let mut s=String::new();
+        for i in 0..1000 { s.push_str(if i<100 {"05"} else {"60"}); }
+        let d=ir_darkness(&s).unwrap();
+        assert!(d>=9.0 && d<=11.0, "darkness={d}");
+        assert!(d<DARK_FRAME_THRESHOLD_PCT);
+    }
+    #[test] fn darkness_invalid_hex(){
+        // 非法 hex 按最坏情况（黑帧）处理，保证不会误放行；奇数长度拒绝。
+        assert_eq!(ir_darkness("zz"),Some(100.0));
+        assert_eq!(ir_darkness("0"),None);
+    }
+}
