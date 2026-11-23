@@ -12,6 +12,7 @@ DEFAULTS = {
     'mode': 'dual', 'rgb_device': '', 'ir_device': '',
     'liveness': 'heuristic', 'threshold': '0.6',
     'ssh_disabled': '1', 'dark_ir_skip': '1', 'auth_frames': '3',
+    'dark_threshold': '60', 'auth_timeout': '4.0', 'liveness_strictness': '0.50',
 }
 CONFIG = Path.home() / '.config' / 'faceauth-rebuild' / 'config'
 

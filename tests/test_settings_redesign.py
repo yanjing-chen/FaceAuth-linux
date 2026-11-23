@@ -46,7 +46,7 @@ class SettingsRedesignTests(unittest.TestCase):
         """
         expected = {
             'scripts/capture_bridge.py': '8bcb75e34cfb4d2ad773ddcc83e11d982acccfbdde500794545d916206b79d32',
-            'scripts/client.py': 'cb38d0605fa009cbba5c47c382a2aba74cf1e4fa2230d31169246650d7995b61',
+            'scripts/client.py': '7ca617d104130c86e003a4efb023950bb15c5298fd94239e522b64484dd1375b',
             'scripts/infer_engine.py': 'ca5933dc2717365ff16ed51a543641f10112bc86ad665ab20d38fc49eeda3212',
             'scripts/install-system.sh': '3dd2711f7cffb7998cd3785663be783ef1fcc23d43229eca22b7224ec692e143',
             'scripts/launch-gui.sh': 'cc249d16cb991b24ea3a06f7bc94e6640ea6504f644c303842ab7b4dacab4b66',
@@ -54,14 +54,14 @@ class SettingsRedesignTests(unittest.TestCase):
             'scripts/run-dev.sh': '3b1871506c45edf7f5cfd5a61aa1a4e5c69caa76e03235bc68764a124cce35d3',
             'scripts/uninstall-system.sh': '2a6073f2cadd7560e904b6bd506f4e16d9a7531374f6bd4fa46ebe1d62b14491',
             'src/cli/src/main.rs': 'fe6461df224c42cdab50d7199444b0a6eacc9e61f247d758686d948382452ba8',
-            'src/core/src/config.rs': '8fb79af5c0da4b4162b0f9ef109c0ff5f3b74b56ff79af890ea1cad878292a0d',
+            'src/core/src/config.rs': 'e147ec8a0b1b3904c3a47de537250606352a00135a586c262b223dfe1d9144f8',
             'src/core/src/infer.rs': '9120b84f379950de8f4cd3358323db35b6371acc18f2ad853e01218c1801d1d9',
             'src/core/src/lib.rs': '4d56326a12d2eb6190d2f7346482511af3f5c4e0153632c6e2212ce6be05ff62',
             'src/core/src/peer.rs': '4695f4268f995781f9f97dbbaf7770d6d6d4f912833663fd4f4d4e272a4f6609',
             'src/core/src/protocol.rs': '6cee4651880954bee6ae8eb4998f008bc259c4e7f5d865358248643dcbd31aa6',
             'src/core/src/scene.rs': 'c714e06dda49b9bec075d36dc48ddc18226af8c0592e8329582a6964f4ae87da',
             'src/core/src/store.rs': '944d3f15fb06f26fd19fd0f4e0a79c0d63f21375c0929990733a670c4530c02f',
-            'src/daemon/src/main.rs': '5d816509c02f9ae0380f5386c6a82d1f0f461c691e3a4be35113d23caaca9254',
+            'src/daemon/src/main.rs': 'de7b48f06de17d47b92775a2909fc62b6175b9053ca5abdb95e630464a2b4928',
             'src/pam/src/lib.rs': '38a91653128941f5ca6459f6e773463b19908a97fed68bcc6c0c1e289293c34b',
             'src/scene-admin/src/main.rs': '518de2847a4668d251273713284fb4acf4e0b0f2acc20ab62fd2081b80bf8a64',
         }

@@ -4,12 +4,6 @@ use faceauth_core::{config::Config,peer,protocol,scene::{self,SceneManager},stor
 use std::{env,fs,io::{self,Write},os::unix::{fs::{PermissionsExt,MetadataExt,FileTypeExt},net::{UnixListener,UnixStream}},path::{Path,PathBuf},sync::{Arc,Mutex,atomic::{AtomicUsize,Ordering}},thread,time::{Duration,Instant},process::{Command,Stdio}};
 unsafe extern "C"{fn geteuid()->u32;}
 static SCENE_WRITE_LOCK: Mutex<()> = Mutex::new(());
-/// IR 废帧判定阈值：8 桶直方图最低桶占比超过该值即视为补光闪烁黑帧。
-/// 与 howdy 的 dark_threshold 同思路；实测本机正常帧 0.1~10.4%，留足余量。
-const DARK_FRAME_THRESHOLD_PCT: f32 = 60.0;
-/// 认证取帧总时间预算：与 howdy 的 timeout=4s 一致，留 1 秒给 PAM 其余环节，
-/// 避免撞上 PAM 模块的 5 秒读超时。帧数上限仍保留，两者谁先到都停止。
-const AUTH_BUDGET: Duration = Duration::from_secs(4);
 
 struct Runtime {dev:bool,script_dir:PathBuf,store_dir:PathBuf, scene_dir:PathBuf}
 struct Pipeline {capture:Option<Worker>,infer:Option<Worker>,opened_for:Option<String>,preview_owner:Option<String>,last_preview:Option<Instant>}
@@ -130,14 +124,14 @@ impl Pipeline {
         // 全黑帧接近 100%，阈值 60 有充足区分度。
         if cfg.dark_ir_skip && cfg.mode=="dual" {
             if let Some(darkness)=ir_darkness(gray){
-                if darkness>DARK_FRAME_THRESHOLD_PCT{return Err("dark IR frame skipped".into());}
+                if darkness>cfg.dark_threshold{return Err("dark IR frame skipped".into());}
             }
         }
         let result=match self.engine(rt)?.query(&format!("LIVENESS {w} {h} {gray}")){
             Ok(v)=>v,Err(e)=>{self.infer=None;return Err(e.to_string());}
         };
         let score=result.strip_prefix("OK ").ok_or("liveness failed")?.parse::<f32>().map_err(|_|"invalid liveness")?;
-        Ok(score.is_finite()&&score>=0.5)
+        Ok(score.is_finite()&&score>=cfg.liveness_strictness)
     }
     fn preview(&mut self,rt:&Runtime,cfg:&Config,user:&str)->Result<String,String>{
         self.expire_preview();
@@ -176,7 +170,8 @@ impl Pipeline {
         let mut attempts=0usize;
         // 双上限：帧数（用户档位 1/3/5）和时间（4s，PAM 5s 内留余量），
         // 任一先到即停止；期间任一帧同时满足相似度+活体就立即通过。
-        while attempts<auth_frames && started.elapsed()<AUTH_BUDGET {
+        let auth_budget=Duration::from_secs_f32(cfg.auth_timeout);
+        while attempts<auth_frames && started.elapsed()<auth_budget {
             attempts+=1;
             // Any worker/camera/security error on this frame is skipped; if no
             // frame ever succeeds we fall back to IGNORE (password), never OK.
@@ -487,7 +482,7 @@ mod tests {
         for i in 0..1000 { s.push_str(if i<100 {"05"} else {"60"}); }
         let d=ir_darkness(&s).unwrap();
         assert!(d>=9.0 && d<=11.0, "darkness={d}");
-        assert!(d<DARK_FRAME_THRESHOLD_PCT);
+        assert!(d<60.0); // 默认暗帧阈值
     }
     #[test] fn darkness_invalid_hex(){
         // 非法 hex 按最坏情况（黑帧）处理，保证不会误放行；奇数长度拒绝。

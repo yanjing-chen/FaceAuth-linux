@@ -468,6 +468,25 @@ class FaceAuthApp(Adw.Application):
                            if key == str(self.cfg.get('auth_frames', '3'))), 1),
             on_change=self.change_auth_frames, compact=True)
         adv_group.add(self.frames_row)
+        # 三个可调识别参数：数值框 + 上下按钮，每项 subtitle 说明调节意义。
+        self._tunable_spin(
+            adv_group, 'dark_threshold_row', '暗帧判定阈值（%）',
+            '8 桶直方图中最暗区域的占比，超过即丢弃该帧（默认 60）。'
+            '调低＝更严格丢弃暗帧，适合补光不稳；调高＝容忍更暗画面',
+            'dark_threshold', 60, 20, 95, 1, 0,
+            lambda v: f'{v:.0f}', '暗帧阈值已保存；请重新做识别测试')
+        self._tunable_spin(
+            adv_group, 'auth_timeout_row', '认证时间预算（秒）',
+            '单次认证最长搜索时间（默认 4.0）。调低＝解锁更快但可能漏判；'
+            '调高＝识别更充分，上限受 PAM 5 秒约束',
+            'auth_timeout', 4.0, 1.5, 4.5, 0.1, 1,
+            lambda v: f'{v:.1f}', '认证时间预算已保存；请重新做识别测试')
+        self._tunable_spin(
+            adv_group, 'liveness_row', '活体严格度',
+            '启发式活体通过门槛（默认 0.50）。调高＝更防伪但可能拒绝真人；'
+            '调低＝更易通过但防伪变弱',
+            'liveness_strictness', 0.5, 0.0, 1.0, 0.05, 2,
+            lambda v: f'{v:.2f}', '活体严格度已保存；请重新做识别测试')
         self.dark_skip_row = Adw.SwitchRow(title='跳过过暗的 IR 帧',
             subtitle='IR 补光闪烁会产生全黑帧，自动丢弃可避免活体误判')
         self.dark_skip_row.set_active(self.cfg.get('dark_ir_skip', '1') == '1')
@@ -646,6 +665,33 @@ class FaceAuthApp(Adw.Application):
     def change_liveness(self, row, _spec):
         self.cfg['liveness'] = LIVENESS[row.get_selected()][0]
         self.save_settings('活体设置已保存；启发式检查不等同安全认证')
+
+    def _tunable_spin(self, group, attr, title, subtitle, key, initial,
+                      low, high, step, digits, fmt, note):
+        """统一的数值设置行：数值框 + 上下小按钮，带说明与初始化防误触发。
+        Adw.SpinRow 是 ActionRow 子类，放进 PreferencesGroup 与其余行风格一致。
+        """
+        setattr(self, f'_{attr}_init', True)
+        try:
+            value = float(self.cfg.get(key, initial))
+        except (TypeError, ValueError):
+            value = initial
+        value = min(high, max(low, value))
+        row = Adw.SpinRow(title=title, subtitle=subtitle)
+        row.set_adjustment(Gtk.Adjustment.new(value, low, high, step, step*5, 0.0))
+        row.set_digits(digits)
+        row.set_numeric(True)
+        setattr(self, attr, row)
+        row.connect('notify::value', lambda r, _p, k=key, f=fmt, n=note, a=attr: self._tunable_changed(r, k, f, n, a))
+        setattr(self, f'_{attr}_init', False)
+        group.add(row)
+        return row
+
+    def _tunable_changed(self, row, key, fmt, note, attr):
+        if getattr(self, f'_{attr}_init', False):
+            return
+        self.cfg[key] = fmt(row.get_value())
+        self.save_settings(note)
 
     def change_threshold(self, row, _prop):
         if getattr(self, '_threshold_init', False):
