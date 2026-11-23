@@ -63,9 +63,14 @@ def admin_request(line, timeout=90):
     import subprocess
     if any(c in line for c in ('\n', '\r')) or len(line) > 6000:
         return 'ERR invalid admin command'
+    # CLI 期望每个命令字是独立参数（它拒绝含空格的单个参数）。
+    # 用 split() 拆开：ENROLL_AS / DELETE_FACE 的 label 与 hex 均已校验无空格。
+    argv = line.split()
+    if not argv:
+        return 'ERR empty admin command'
     try:
         proc = subprocess.run(
-            ['/usr/bin/pkexec', ADMIN_CLI, line],
+            ['/usr/bin/pkexec', ADMIN_CLI] + argv,
             capture_output=True, text=True, timeout=timeout)
     except FileNotFoundError:
         return 'ERR pkexec or CLI unavailable'

@@ -46,7 +46,7 @@ class SettingsRedesignTests(unittest.TestCase):
         """
         expected = {
             'scripts/capture_bridge.py': 'a42e31330a8b642eeca1d7596b20cc39b2eee38149275f26d9594edaf55de02f',
-            'scripts/client.py': '99d27959bcb70e244050a0e998ff147a9ccb98afe70982535f623b206ae76ade',
+            'scripts/client.py': '53b5d30957e1f3973de065d71403819d3ba81e69c0442174c2e1544a64a0ab81',
             'scripts/infer_engine.py': 'ca5933dc2717365ff16ed51a543641f10112bc86ad665ab20d38fc49eeda3212',
             'scripts/install-system.sh': '3dd2711f7cffb7998cd3785663be783ef1fcc23d43229eca22b7224ec692e143',
             'scripts/launch-gui.sh': 'cc249d16cb991b24ea3a06f7bc94e6640ea6504f644c303842ab7b4dacab4b66',
