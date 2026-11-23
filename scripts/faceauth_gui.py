@@ -546,8 +546,7 @@ class FaceAuthApp(Adw.Application):
         # SSH 也是认证场景准入，归到本组。开关语义与其它场景一致：
         # 开启=允许该场景刷脸，关闭=禁用。后端 ssh_disabled=1 表示禁用，
         # 故此处做一次取反映射；默认禁用（安全），无需管理员授权。
-        self.ssh_row = Adw.SwitchRow(title='SSH / 远程会话',
-            subtitle='开启=允许 SSH 会话刷脸；关闭=SSH 直接回退密码、不启动摄像头（安全默认）')
+        self.ssh_row = Adw.SwitchRow(title='SSH / 远程会话')
         self.ssh_row.set_active(self.cfg.get('ssh_disabled', '1') != '1')
         self.ssh_row.connect('notify::active', self.on_ssh_disabled)
         scene_group.add(self.ssh_row)
