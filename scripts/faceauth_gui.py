@@ -492,11 +492,6 @@ class FaceAuthApp(Adw.Application):
         self.dark_skip_row.set_active(self.cfg.get('dark_ir_skip', '1') == '1')
         self.dark_skip_row.connect('notify::active', self.on_dark_skip)
         adv_group.add(self.dark_skip_row)
-        self.ssh_row = Adw.SwitchRow(title='SSH 远程会话禁用刷脸',
-            subtitle='远程登录时自动回退密码（安全默认，需 PAM 模块支持）')
-        self.ssh_row.set_active(self.cfg.get('ssh_disabled', '1') == '1')
-        self.ssh_row.connect('notify::active', self.on_ssh_disabled)
-        adv_group.add(self.ssh_row)
         hardware_column.append(adv_group)
 
         dev_group = Adw.PreferencesGroup(title='摄像头',
@@ -540,7 +535,7 @@ class FaceAuthApp(Adw.Application):
         account_column.append(face_group)
 
         scene_group = Adw.PreferencesGroup(title='系统认证',
-            description='需要管理员授权；刷脸失败保留系统密码回退')
+            description='控制哪些场景允许刷脸；场景开关需管理员授权，失败均保留密码回退')
         for name, title in SCENES:
             r = Adw.SwitchRow(title=title)
             # Explanation belongs to the group, not repeated across five rows.
@@ -548,6 +543,13 @@ class FaceAuthApp(Adw.Application):
             r.connect('notify::active', self.scene_toggled, name)
             scene_group.add(r)
             self.scene_rows[name] = r
+        # SSH 也是认证场景准入（远程会话禁止刷脸），归到本组；
+        # 它是本地保存的安全默认，无需管理员授权，不占 PAM 场景名额。
+        self.ssh_row = Adw.SwitchRow(title='SSH / 远程会话禁用刷脸',
+            subtitle='开启时：SSH 会话直接回退密码，不启动摄像头（安全默认，本地保存）')
+        self.ssh_row.set_active(self.cfg.get('ssh_disabled', '1') == '1')
+        self.ssh_row.connect('notify::active', self.on_ssh_disabled)
+        scene_group.add(self.ssh_row)
         account_column.append(scene_group)
 
         footer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=7)
