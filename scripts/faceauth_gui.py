@@ -30,6 +30,8 @@ from recognition_result import interpret_test_reply
 
 MODES = [('rgb', '单 RGB（彩色）'), ('ir', '单 IR（红外）'), ('dual', '双模 RGB + IR')]
 LIVENESS = [('none', '无活体（存在风险）'), ('heuristic', 'IR / 图像启发式（有限防伪）')]
+# 相似度阈值档位：与工作模式/活体复用同一个 ReadableChoiceRow，风格一致。
+THRESHOLDS = [('0.45', '宽松（0.45）'), ('0.6', '标准（0.60）'), ('0.75', '严格（0.75）')]
 SCENES = [('sudo', 'sudo 提权'), ('gdm', 'GDM 登录 / 锁屏'),
           ('su', 'su 用户切换'), ('login', 'TTY 登录'), ('polkit', 'polkit 图形授权')]
 
@@ -433,6 +435,14 @@ class FaceAuthApp(Adw.Application):
             selected=next((i for i, (key, _) in enumerate(LIVENESS) if key == self.cfg['liveness']), 1),
             on_change=self.change_liveness, compact=True)
         group.add(self.live_row)
+        self.threshold_row = ReadableChoiceRow('识别灵敏度', [
+            (THRESHOLDS[0][1], '阈值 0.45：更容易通过，但安全性降低（误接受风险升高）', '宽松 0.45'),
+            (THRESHOLDS[1][1], '阈值 0.60：推荐默认值，兼顾通过率与安全性', '标准 0.60'),
+            (THRESHOLDS[2][1], '阈值 0.75：更安全，但可能需要重新录入或多次尝试', '严格 0.75')],
+            selected=next((i for i, (key, _) in enumerate(THRESHOLDS)
+                           if abs(float(key) - float(self.cfg.get('threshold', 0.6))) < 0.001), 1),
+            on_change=self.change_threshold, compact=True)
+        group.add(self.threshold_row)
         hardware_column.append(group)
 
         dev_group = Adw.PreferencesGroup(title='摄像头',
@@ -601,6 +611,10 @@ class FaceAuthApp(Adw.Application):
     def change_liveness(self, row, _spec):
         self.cfg['liveness'] = LIVENESS[row.get_selected()][0]
         self.save_settings('活体设置已保存；启发式检查不等同安全认证')
+
+    def change_threshold(self, row, _spec):
+        self.cfg['threshold'] = THRESHOLDS[row.get_selected()][0]
+        self.save_settings('识别灵敏度已保存；调低更易通过但安全性下降，请重新做识别测试')
 
     def save_settings(self, note):
         try:
