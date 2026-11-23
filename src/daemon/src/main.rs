@@ -128,20 +128,41 @@ impl Pipeline {
     }
     fn authenticate(&mut self,rt:&Runtime,cfg:&Config,store:&FaceStore)->String{
         if store.faces.is_empty(){return "IGNORE no-template".into();}
-        // Any worker/camera/security error is IGNORE, never OK.
-        let result=(||->Result<(String,f32,bool),String>{
-            let s=self.snap(rt,cfg)?;
-            let embed=self.embedding(rt,&s)?;
-            let (label,sim)=store.best_match(&embed).ok_or("no enrollment")?;
-            if sim<cfg.threshold{return Ok((label.into(),sim,false));}
-            let live=self.live(rt,cfg,&s)?;
-            Ok((label.into(),sim,live))
-        })();
-        match result {
-            Ok((label,sim,true))if sim>=cfg.threshold=>format!("OK mode={} sim={sim:.3} face={label} result=accepted",cfg.mode),
-            Ok((label,sim,false))if sim>=cfg.threshold=>format!("DENIED mode={} sim={sim:.3} face={label} result=liveness",cfg.mode),
-            Ok((label,sim,_))=>format!("DENIED mode={} sim={sim:.3} face={label} result=mismatch",cfg.mode),
-            Err(_)=>"IGNORE unavailable-or-processing-error".into(),
+        // 多帧择优：单帧取景受姿态/曝光/瞬态遮挡影响会偶发低相似度，
+        // 采多帧取最高相似度能显著提升通过率（录入侧本就是 5 帧平均）。
+        // 每帧仍独立做完整判定（比对 + 活体），任一帧通过即接受。
+        // 快速成功：首帧通过则立即返回，不增加正常路径的认证耗时。
+        const AUTH_FRAMES:usize=3;
+        let mut best:(String,f32,bool)=(String::new(),-1.0,false);
+        let mut saw_frame=false;
+        for _ in 0..AUTH_FRAMES {
+            // Any worker/camera/security error on this frame is skipped; if no
+            // frame ever succeeds we fall back to IGNORE (password), never OK.
+            let result=(||->Result<(String,f32,bool),String>{
+                let s=self.snap(rt,cfg)?;
+                let embed=self.embedding(rt,&s)?;
+                let (label,sim)=store.best_match(&embed).ok_or("no enrollment")?;
+                if sim<cfg.threshold{return Ok((label.into(),sim,false));}
+                let live=self.live(rt,cfg,&s)?;
+                Ok((label.into(),sim,live))
+            })();
+            match result {
+                Ok((label,sim,live))=>{
+                    saw_frame=true;
+                    if sim>best.1{best=(label.clone(),sim,live);}
+                    if sim>=cfg.threshold && live {
+                        return format!("OK mode={} sim={sim:.3} face={label} result=accepted",cfg.mode);
+                    }
+                }
+                Err(_)=>{ /* 单帧故障：继续尝试下一帧 */ }
+            }
+        }
+        if !saw_frame {return "IGNORE unavailable-or-processing-error".into();}
+        let (label,sim,live)=best;
+        if sim>=cfg.threshold && !live {
+            format!("DENIED mode={} sim={sim:.3} face={label} result=liveness",cfg.mode)
+        }else{
+            format!("DENIED mode={} sim={sim:.3} face={label} result=mismatch",cfg.mode)
         }
     }
 }
