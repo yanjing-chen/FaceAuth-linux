@@ -11,6 +11,7 @@ import stat
 DEFAULTS = {
     'mode': 'dual', 'rgb_device': '', 'ir_device': '',
     'liveness': 'heuristic', 'threshold': '0.6',
+    'ssh_disabled': '1', 'dark_ir_skip': '1', 'auth_frames': '3',
 }
 CONFIG = Path.home() / '.config' / 'faceauth-rebuild' / 'config'
 

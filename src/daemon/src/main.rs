@@ -10,6 +10,7 @@ struct Pipeline {capture:Option<Worker>,infer:Option<Worker>,opened_for:Option<S
 struct Snap{w:usize,h:usize,gray:String,ir_w:usize,ir_h:usize,ir_gray:String}
 
 fn worker_error(text:&str)->String {if text.starts_with("ERR"){text.into()}else{"ERR device or inference unavailable".into()}}
+fn hex_nibble(b:u8)->Option<u8>{match b{b'0'..=b'9'=>Some(b-b'0'),b'a'..=b'f'=>Some(b-b'a'+10),b'A'..=b'F'=>Some(b-b'A'+10),_=>None}}
 fn parse_snap(text:&str)->Result<Snap,String>{
     let mut parts=text.splitn(7,' ');
     if parts.next()!=Some("OK"){return Err(worker_error(text));}
@@ -96,6 +97,21 @@ impl Pipeline {
             if s.ir_w==0 || s.ir_h==0{return Err("IR required".into());}
             (s.ir_w,s.ir_h,&s.ir_gray)
         }else{(s.w,s.h,&s.gray)};
+        // 暗 IR 帧跳过：补光闪烁会产生全黑帧，直接拒绝该帧让多帧逻辑重取。
+        // 用采样字节估算亮度，避免逐像素解析整个 hex（性能）。
+        if cfg.dark_ir_skip && cfg.mode=="dual" {
+            let bytes=gray.as_bytes();
+            let step=(bytes.len()/256).max(2);
+            let mut sum=0u64;let mut n=0u64;
+            let mut i=0usize;
+            while i+1<bytes.len(){
+                if let (Some(a),Some(b))=(hex_nibble(bytes[i]),hex_nibble(bytes[i+1])){
+                    sum+=(a*16+b) as u64;n+=1;
+                }
+                i+=step*2;
+            }
+            if n>0 && sum/n < 12 {return Err("dark IR frame skipped".into());}
+        }
         let result=match self.engine(rt)?.query(&format!("LIVENESS {w} {h} {gray}")){
             Ok(v)=>v,Err(e)=>{self.infer=None;return Err(e.to_string());}
         };
@@ -132,10 +148,10 @@ impl Pipeline {
         // 采多帧取最高相似度能显著提升通过率（录入侧本就是 5 帧平均）。
         // 每帧仍独立做完整判定（比对 + 活体），任一帧通过即接受。
         // 快速成功：首帧通过则立即返回，不增加正常路径的认证耗时。
-        const AUTH_FRAMES:usize=3;
+        let auth_frames=cfg.effective_auth_frames();
         let mut best:(String,f32,bool)=(String::new(),-1.0,false);
         let mut saw_frame=false;
-        for _ in 0..AUTH_FRAMES {
+        for _ in 0..auth_frames {
             // Any worker/camera/security error on this frame is skipped; if no
             // frame ever succeeds we fall back to IGNORE (password), never OK.
             let result=(||->Result<(String,f32,bool),String>{

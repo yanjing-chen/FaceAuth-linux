@@ -32,6 +32,8 @@ MODES = [('rgb', '单 RGB（彩色）'), ('ir', '单 IR（红外）'), ('dual', 
 LIVENESS = [('none', '无活体（存在风险）'), ('heuristic', 'IR / 图像启发式（有限防伪）')]
 # 相似度阈值档位：与工作模式/活体复用同一个 ReadableChoiceRow，风格一致。
 THRESHOLDS = [('0.45', '宽松（0.45）'), ('0.6', '标准（0.60）'), ('0.75', '严格（0.75）')]
+# 认证帧数档位：帧数越多越稳，但认证耗时略增（PAM 5 秒超时上限）。
+AUTH_FRAMES = [('1', '快速（1 帧）'), ('3', '均衡（3 帧）'), ('5', '稳健（5 帧）')]
 SCENES = [('sudo', 'sudo 提权'), ('gdm', 'GDM 登录 / 锁屏'),
           ('su', 'su 用户切换'), ('login', 'TTY 登录'), ('polkit', 'polkit 图形授权')]
 
@@ -445,6 +447,29 @@ class FaceAuthApp(Adw.Application):
         group.add(self.threshold_row)
         hardware_column.append(group)
 
+        # 高级识别策略：本地保存，与管理员授权的 PAM 场景开关分开。
+        adv_group = Adw.PreferencesGroup(title='识别策略',
+            description='本地生效，无需管理员授权')
+        self.frames_row = ReadableChoiceRow('识别帧数', [
+            (AUTH_FRAMES[0][1], '只取 1 帧：最快（约 1 秒），瞬态波动可能导致偶发不通过', '快速 1 帧'),
+            (AUTH_FRAMES[1][1], '取 3 帧择优：默认，兼顾速度与稳定性（约 2-3 秒）', '均衡 3 帧'),
+            (AUTH_FRAMES[2][1], '取 5 帧择优：最稳，但接近 PAM 5 秒超时上限', '稳健 5 帧')],
+            selected=next((i for i, (key, _) in enumerate(AUTH_FRAMES)
+                           if key == str(self.cfg.get('auth_frames', '3'))), 1),
+            on_change=self.change_auth_frames, compact=True)
+        adv_group.add(self.frames_row)
+        self.dark_skip_row = Adw.SwitchRow(title='跳过过暗的 IR 帧',
+            subtitle='IR 补光闪烁会产生全黑帧，自动丢弃可避免活体误判')
+        self.dark_skip_row.set_active(self.cfg.get('dark_ir_skip', '1') == '1')
+        self.dark_skip_row.connect('notify::active', self.on_dark_skip)
+        adv_group.add(self.dark_skip_row)
+        self.ssh_row = Adw.SwitchRow(title='SSH 远程会话禁用刷脸',
+            subtitle='远程登录时自动回退密码（安全默认，需 PAM 模块支持）')
+        self.ssh_row.set_active(self.cfg.get('ssh_disabled', '1') == '1')
+        self.ssh_row.connect('notify::active', self.on_ssh_disabled)
+        adv_group.add(self.ssh_row)
+        hardware_column.append(adv_group)
+
         dev_group = Adw.PreferencesGroup(title='摄像头',
             description='支持复合模组或两台独立摄像头；完整路径可在菜单中查看')
         self.rgb_choice = self.device_picker('RGB 彩色', 'rgb_device', dev_group)
@@ -615,6 +640,18 @@ class FaceAuthApp(Adw.Application):
     def change_threshold(self, row, _spec):
         self.cfg['threshold'] = THRESHOLDS[row.get_selected()][0]
         self.save_settings('识别灵敏度已保存；调低更易通过但安全性下降，请重新做识别测试')
+
+    def change_auth_frames(self, row, _spec):
+        self.cfg['auth_frames'] = AUTH_FRAMES[row.get_selected()][0]
+        self.save_settings('识别帧数已保存；帧数越多越稳，但认证耗时略增')
+
+    def on_dark_skip(self, row, _prop):
+        self.cfg['dark_ir_skip'] = '1' if row.get_active() else '0'
+        self.save_settings('暗 IR 帧跳过设置已保存')
+
+    def on_ssh_disabled(self, row, _prop):
+        self.cfg['ssh_disabled'] = '1' if row.get_active() else '0'
+        self.save_settings('SSH 远程会话设置已保存；关闭后远程 SSH 中也会尝试刷脸')
 
     def save_settings(self, note):
         try:
