@@ -26,17 +26,25 @@ MAX_WIDTH, MAX_HEIGHT = 800, 600
 WARMUP_FRAMES = 3
 
 
-def index_for(path):
+def validate_video_path(path):
+    """安全校验：确认路径最终解析到合法的 V4L2 /dev/videoN 字符设备。
+
+    注意：只做校验，不返回数字索引。必须用原始稳定路径（by-id/by-path）
+    打开摄像头——若解析成 videoN 数字，重启后内核重新分配编号会导致
+    RGB 与 IR 错位（表现为只有 IR 灯闪、识别失败）。
+    """
     target = os.path.realpath(path)
     if not re.fullmatch(r'/dev/video\d+', target):
         raise ValueError('only V4L2 /dev/videoN devices permitted')
     if not stat.S_ISCHR(os.stat(target).st_mode):
         raise ValueError('not a character device')
-    return int(target[len('/dev/video'):])
+    return target
 
 
 def open_cap(path):
-    cap = cv2.VideoCapture(index_for(path), cv2.CAP_V4L2)
+    validate_video_path(path)
+    # 直接用稳定路径打开，不用 videoN 数字，避免重启后编号漂移导致摄像头错位。
+    cap = cv2.VideoCapture(path, cv2.CAP_V4L2)
     if not cap.isOpened():
         cap.release()
         raise RuntimeError('camera unavailable')
@@ -54,6 +62,26 @@ def open_cap(path):
         if not ok:
             break
     return cap
+
+
+def _same_camera(cap_a, cap_b):
+    """Rough check that two opened streams are not the same physical camera.
+    Different resolutions => definitely different. Same resolution => compare
+    a small downsampled frame; near-identical images mean same source.
+    """
+    try:
+        ok_a, fa = cap_a.read()
+        ok_b, fb = cap_b.read()
+        if not ok_a or not ok_b or fa is None or fb is None:
+            return False  # unreadable -> do not block OPEN on a guess
+        if fa.shape[:2] != fb.shape[:2]:
+            return False
+        small_a = cv2.resize(fa, (32, 32))
+        small_b = cv2.resize(fb, (32, 32))
+        diff = float(cv2.absdiff(small_a, small_b).mean())
+        return diff < 1.0
+    except Exception:
+        return False
 
 
 def visual_color_kind(image):
@@ -188,6 +216,12 @@ def main():
                         if os.path.realpath(rgb_path) == os.path.realpath(ir_path):
                             raise ValueError('dual mode needs two distinct video nodes')
                         ir = open_cap(ir_path)
+                        # 深度校验：即使路径字符串不同，也要确认打开后是两个不同画面源。
+                        # 重启后若两个稳定路径被解析到同一节点，这里会拒绝 OPEN，
+                        # 避免静默用同一路画面既当 RGB 又当 IR 导致识别失败。
+                        if _same_camera(rgb, ir):
+                            rgb.release(); ir.release(); rgb = ir = None
+                            raise ValueError('RGB and IR resolved to the same camera')
                 print('OK', flush=True)
                 continue
             if p[0] == 'TYPES':
