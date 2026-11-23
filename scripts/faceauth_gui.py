@@ -760,12 +760,15 @@ class FaceAuthApp(Adw.Application):
     def enroll_done(self, response):
         self.set_busy(False)
         ok = response.startswith('OK ')
+        denied = 'authorization' in (response or '').lower()
         self.progress.set_fraction(1 if ok else 0)
         self.status.set_label(('录入成功：' if ok else '录入未完成：') + response + ' · 预览继续')
         self.resume_continuous_preview()
         dialog = Adw.AlertDialog()
-        dialog.set_heading('录入成功' if ok else '录入未完成')
-        dialog.set_body(response if response else ('已完成 5 帧采集并写入模板。' if ok else '请检查摄像头、IR 与人脸位置后重试。'))
+        dialog.set_heading('录入成功' if ok else ('管理员授权未通过' if denied else '录入未完成'))
+        dialog.set_body(
+            '本次录入需要管理员授权；已取消或未通过授权，未写入任何人脸数据。' if denied
+            else (response if response else ('已完成 5 帧采集并写入模板。' if ok else '请检查摄像头、IR 与人脸位置后重试。')))
         dialog.add_response('close', '关闭')
         dialog.set_default_response('close')
         dialog.set_close_response('close')
@@ -927,8 +930,10 @@ class FaceAuthApp(Adw.Application):
         self.async_request(command, self.delete_done)
 
     def delete_done(self, response):
-        self.status.set_label(response)
-        self.settings_feedback.set_label('人脸管理：' + response)
+        denied = 'authorization' in (response or '').lower()
+        note = ('管理员授权未通过，人脸未被删除。' if denied else response)
+        self.status.set_label(note)
+        self.settings_feedback.set_label('人脸管理：' + note)
         self.refresh_lists()
 
     def tick(self):

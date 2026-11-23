@@ -30,6 +30,7 @@ for f in assets/models/*.onnx; do
     install -o root -g root -m 0644 "$f" "/usr/libexec/faceauth-rebuild/assets/models/$(basename "$f")"
 done
 install -o root -g root -m 0644 packaging/org.faceauth.rebuild.manage-scenes.policy /usr/share/polkit-1/actions/
+install -o root -g root -m 0644 packaging/org.faceauth.rebuild.manage-models.policy /usr/share/polkit-1/actions/
 install -o root -g root -m 0644 packaging/faceauth-rebuild.service /etc/systemd/system/
 # This explicit test profile is not used by GDM/sudo/polkit.
 if [[ ! -e /etc/pam.d/faceauth-rebuild-test ]]; then

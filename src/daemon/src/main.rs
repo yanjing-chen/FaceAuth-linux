@@ -223,13 +223,13 @@ fn proc_starttime(pid:i32)->Result<u64,String>{
     raw[end+1..].split_whitespace().nth(19).ok_or("missing process starttime")?
         .parse::<u64>().map_err(|_|"invalid process starttime".into())
 }
-fn authorize_scene(rt:&Runtime, uid:u32, pid:i32)->Result<(),String>{
+fn authorize_action(rt:&Runtime, uid:u32, pid:i32, action:&str)->Result<(),String>{
     if rt.dev {return Ok(());}
     if uid==0{return Ok(());}
     let before=proc_starttime(pid)?;
     let identity=format!("{pid},{before},{uid}");
     let mut child=Command::new("/usr/bin/pkcheck")
-        .args(["--action-id","org.faceauth.rebuild.manage-scenes", "--process",&identity,"--allow-user-interaction"])
+        .args(["--action-id",action, "--process",&identity,"--allow-user-interaction"])
         .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
         .spawn().map_err(|_|"polkit authorization unavailable".to_string())?;
     let until=Instant::now()+Duration::from_secs(45);
@@ -243,6 +243,13 @@ fn authorize_scene(rt:&Runtime, uid:u32, pid:i32)->Result<(),String>{
     if !result{return Err("administrator authorization denied, cancelled or expired".into());}
     if proc_starttime(pid)?!=before{return Err("peer process identity changed".into());}
     Ok(())
+}
+fn authorize_scene(rt:&Runtime,uid:u32,pid:i32)->Result<(),String>{
+    authorize_action(rt,uid,pid,"org.faceauth.rebuild.manage-scenes")
+}
+/// 录入/删除人脸需要管理员授权，防止他人在同一会话中偷偷登记或删除人脸。
+fn authorize_models(rt:&Runtime,uid:u32,pid:i32)->Result<(),String>{
+    authorize_action(rt,uid,pid,"org.faceauth.rebuild.manage-models")
 }
 fn handle(rt:&Runtime,pipe:&Mutex<Pipeline>,uid:u32,pid:i32,input:&str)->String {
     let p:Vec<&str>=input.split_whitespace().collect();
@@ -276,13 +283,16 @@ fn handle(rt:&Runtime,pipe:&Mutex<Pipeline>,uid:u32,pid:i32,input:&str)->String 
             Ok(s)=>format!("OK {} {}",s.faces.len(),s.faces.iter().map(|f|f.label.as_str()).collect::<Vec<_>>().join(",")),
             Err(_)=>"ERR template unreadable or damaged".into()},
         "DELETE" if p.len()==2=>{
+            if let Err(e)=authorize_models(rt,uid,pid){return format!("ERR {e}");}
             match fs::remove_file(path){Ok(_)=>"OK deleted".into(),Err(ref e)if e.kind()==io::ErrorKind::NotFound=>"OK no model".into(),Err(_)=>"ERR delete failed".into()}
         },
         "DELETE_FACE" if p.len()==3=>{
+            if let Err(e)=authorize_models(rt,uid,pid){return format!("ERR {e}");}
             match FaceStore::load(&path){Ok(mut st)=>{if !st.remove(p[2]){"OK no such face".into()}
                 else{match st.save(&path){Ok(_)=>"OK deleted".into(),Err(_)=>"ERR unable to write template".into()}}},Err(_)=>"ERR template damaged".into()}
         },
         "ENROLL"|"ENROLL_AS" if (p[0]=="ENROLL"&&p.len()==3)||(p[0]=="ENROLL_AS"&&p.len()==4)=>{
+            if let Err(e)=authorize_models(rt,uid,pid){return format!("ERR {e}");}
             let (label,hex)=if p[0]=="ENROLL"{("default",p[2])}else{(p[2],p[3])};
             if protocol::normalize_label(label).is_none(){return "ERR invalid label".into();}
             let e=match protocol::decode_embedding(hex){Ok(e)=>e,Err(_)=>return "ERR bad embedding".into()};
@@ -325,6 +335,8 @@ fn handle(rt:&Runtime,pipe:&Mutex<Pipeline>,uid:u32,pid:i32,input:&str)->String 
         },
         "ENROLL_CAPTURE" if p.len()==3=>{
             if protocol::normalize_label(p[2]).is_none(){return "ERR invalid label".into();}
+            // 授权必须在采帧之前：取消授权则完全不碰摄像头、不写入模板。
+            if let Err(e)=authorize_models(rt,uid,pid){return format!("ERR {e}");}
             let cfg=match system_config(rt,user){Ok(c)=>c,Err(_)=>return "ERR configure a camera first".into()};
             let face=match pipe.lock(){
                 Ok(mut x)=>{

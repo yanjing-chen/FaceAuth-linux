@@ -13,7 +13,7 @@ class RedesignContracts(unittest.TestCase):
         gui=(ROOT/'scripts/faceauth_gui.py').read_text()
         for name in ('on_enroll','on_test','enroll_done','test_done','scene_toggled','scene_confirmed','populate_faces'):
             self.assertIn('def '+name+'(',gui)
-        self.assertIn("dialog.set_heading('录入成功' if ok else '录入未完成')",gui)
+        self.assertIn("'管理员授权未通过' if denied else '录入未完成'",gui)
         self.assertIn('dialog.set_heading(result.heading)',gui)
     def test_core_pam_unchanged(self):
         pam=(ROOT/'src/pam/src/lib.rs').read_text()

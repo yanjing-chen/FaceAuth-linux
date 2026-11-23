@@ -26,7 +26,7 @@ PAM
     fi
     rm -f "$EXPECTED"
 fi
-rm -f /etc/systemd/system/faceauth-rebuild.service /usr/share/polkit-1/actions/org.faceauth.rebuild.manage-scenes.policy
+rm -f /etc/systemd/system/faceauth-rebuild.service /usr/share/polkit-1/actions/org.faceauth.rebuild.manage-scenes.policy /usr/share/polkit-1/actions/org.faceauth.rebuild.manage-models.policy
 rm -f /usr/bin/faceauth-rebuild-cli
 rm -rf /usr/libexec/faceauth-rebuild /usr/lib/faceauth-rebuild
 systemctl daemon-reload
