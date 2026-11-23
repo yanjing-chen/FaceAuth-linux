@@ -236,6 +236,8 @@ class FaceAuthApp(Adw.Application):
         self.win = win
         win.set_default_size(980, 650)
         win.set_size_request(790, 550)
+        # 窗口/任务栏图标：与桌面入口使用同一个已安装的图标名
+        win.set_icon_name('faceauth')
         css = Gtk.CssProvider()
         css.load_from_path(str(Path(__file__).with_name('gui_style.css')))
         Gtk.StyleContext.add_provider_for_display(
