@@ -1,5 +1,7 @@
 # FaceAuth Rebuild
 
+[![build](https://github.com/yanjing-chen/FaceAuth-linux/actions/workflows/build.yml/badge.svg)](https://github.com/yanjing-chen/FaceAuth-linux/actions/workflows/build.yml)
+
 Linux 下的双摄人脸识别认证：RGB 摄像头做身份识别、IR 摄像头做活体辅助判断，通过 PAM 接入 `sudo` / GDM / `polkit` 等场景，失败时保留系统密码回退。提供 GTK4 / libadwaita 图形界面管理摄像头、人脸模板与认证场景。
 
 > 试验性项目。IR 活体是启发式辅助判断，不等同 Windows Hello 的硬件级防伪，不能替代系统密码。
