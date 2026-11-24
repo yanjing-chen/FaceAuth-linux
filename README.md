@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icons/faceauth-128.png" alt="FaceAuth Linux icon" width="128" />
+</p>
+
 # FaceAuth Linux
 
 [![build](https://github.com/yanjing-chen/FaceAuth-linux/actions/workflows/build.yml/badge.svg)](https://github.com/yanjing-chen/FaceAuth-linux/actions/workflows/build.yml)
