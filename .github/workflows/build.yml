@@ -7,7 +7,13 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Test both the newest runner and the oldest supported release (24.04).
+    # libadwaita >=1.4 is required by Adw.SpinRow; 22.04 only has 1.1.x.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04]
     steps:
       - uses: actions/checkout@v7
 
@@ -20,6 +26,19 @@ jobs:
           sudo apt-get install -y cargo rustc curl libpam0g-dev \
             python3-opencv python3-numpy python3-gi \
             gir1.2-gtk-4.0 gir1.2-adw-1 libadwaita-1-0
+
+      - name: Check GUI/OpenCV API availability
+        run: |
+          /usr/bin/python3 - <<'PY'
+          import gi
+          gi.require_version('Adw', '1')
+          from gi.repository import Adw
+          import cv2
+          print('libadwaita SpinRow:', hasattr(Adw, 'SpinRow'))
+          print('OpenCV', cv2.__version__, 'YuNet:', hasattr(cv2, 'FaceDetectorYN_create'))
+          assert hasattr(Adw, 'SpinRow'), 'Adw.SpinRow missing (libadwaita < 1.4)'
+          assert hasattr(cv2, 'FaceDetectorYN_create'), 'YuNet missing in python3-opencv'
+          PY
 
       - name: Download OpenCV Zoo models
         run: bash scripts/fetch-models.sh

@@ -6,6 +6,25 @@ Linux 下的双摄人脸识别认证：RGB 摄像头做身份识别、IR 摄像�
 
 > 试验性项目。IR 活体是启发式辅助判断，不等同 Windows Hello 的硬件级防伪，不能替代系统密码。
 
+## 系统要求
+
+- **Ubuntu 24.04 LTS 或更新版本**（含 26.04 / 26.10）。**Ubuntu 22.04 及更早版本不支持**：GUI 用到 libadwaita 1.4 才引入的 `Adw.SpinRow` 等控件，22.04 只有 1.1.7，启动即报错。
+- GNOME / Wayland 图形会话（GUI 不能以 root 运行）。
+- 支持 V4L2 的摄像头；双摄（RGB + IR）体验最佳，单摄也可用。
+
+安装前可用下面这条命令自检（两项都应输出 `True`，否则不要继续安装）：
+
+```bash
+/usr/bin/python3 - <<'PY'
+import gi
+gi.require_version('Adw', '1')
+from gi.repository import Adw
+print('Adw.SpinRow (需 True):', hasattr(Adw, 'SpinRow'))
+import cv2
+print('OpenCV', cv2.__version__, '| YuNet (需 True):', hasattr(cv2, 'FaceDetectorYN_create'))
+PY
+```
+
 ## 安装（一条命令）
 
 Ubuntu / Debian 系发行版，从源码构建、下载模型并安装系统服务：
