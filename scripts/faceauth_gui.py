@@ -831,6 +831,16 @@ class FaceAuthApp(Adw.Application):
             self.set_busy(False)
             self.progress.set_fraction(0)
             self.status.set_label('采集失败：' + response)
+            # 明确弹窗告知失败，避免只有状态栏一行字、看起来像“没反应”。
+            dlg = Adw.AlertDialog()
+            dlg.set_heading('人脸采集未完成')
+            dlg.set_body('采集 5 帧或活体检测未通过，没有录入人脸，也没有弹出密码框。\n'
+                         '请检查：是否正对摄像头、IR 补光是否亮起、环境是否过暗，然后重试。\n'
+                         '技术信息：' + response[:160])
+            dlg.add_response('close', '关闭')
+            dlg.set_default_response('close')
+            dlg.set_close_response('close')
+            dlg.present(self.win)
             return
         embedding = response[3:].strip()
         self.progress.set_fraction(0.6)
