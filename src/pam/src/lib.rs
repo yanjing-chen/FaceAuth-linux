@@ -20,12 +20,12 @@ fn in_ssh_session(pamh:*mut c_void)->bool{
     pam_env(pamh,"SSH_CONNECTION").is_some()||pam_env(pamh,"SSH_TTY").is_some()
 }
 /// 用户是否允许在 SSH 会话中刷脸。默认禁止（安全默认）；
-/// 仅当 ~/.config/faceauth-rebuild/config 明确写 ssh_disabled=0/false 时才允许。
+/// 仅当 ~/.config/faceauth-linux/config 明确写 ssh_disabled=0/false 时才允许。
 fn ssh_face_allowed(pamh:*mut c_void,user:&str)->bool{
     let home=match pam_env(pamh,"HOME"){Some(h) if !h.is_empty()=>h,
         _=>return false}; // 读不到 home -> 保持安全默认（禁止）
     if !user.bytes().all(|c|c.is_ascii_alphanumeric()||c==b'_'||c==b'-'||c==b'.'){return false;}
-    let path=format!("{home}/.config/faceauth-rebuild/config");
+    let path=format!("{home}/.config/faceauth-linux/config");
     let text=match std::fs::read_to_string(&path){Ok(t)=>t,Err(_)=>return false};
     for line in text.lines(){
         let line=line.split('#').next().unwrap_or("").trim();
@@ -45,7 +45,7 @@ fn authenticate(pamh:*mut c_void)->Result<bool,()> {
     if u.is_empty()||u.len()>128||!u.bytes().all(|c|c.is_ascii_alphanumeric()||c==b'_'||c==b'-'||c==b'.'){return Err(());}
     // SSH 远程会话：默认回退密码，不触发摄像头（仅用户显式关闭时才继续刷脸）。
     if in_ssh_session(pamh) && !ssh_face_allowed(pamh,u){return Err(());}
-    let mut s=UnixStream::connect("/run/faceauth-rebuild/daemon.sock").map_err(|_|())?;
+    let mut s=UnixStream::connect("/run/faceauth-linux/daemon.sock").map_err(|_|())?;
     s.set_read_timeout(Some(Duration::from_secs(12))).map_err(|_|())?;
     s.set_write_timeout(Some(Duration::from_secs(5))).map_err(|_|())?;
     s.write_all(format!("AUTH {u}\n").as_bytes()).map_err(|_|())?;

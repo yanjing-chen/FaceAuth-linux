@@ -2,7 +2,7 @@
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
 <policyconfig>
   <vendor>FaceAuth Rebuild</vendor>
-  <action id="org.faceauth.rebuild.manage-models">
+  <action id="org.faceauth.linux.manage-models">
     <description>Enroll or delete face models</description>
     <message>Administrator authorization is required to add or remove face recognition data.</message>
     <description xml:lang="zh_CN">录入或删除人脸模板</description>

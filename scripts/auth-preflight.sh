@@ -11,11 +11,11 @@ printf '%s\n' '=== FaceAuth 系统认证启用前检查（只读） ==='
 printf '当前系统：'
 if [[ -r /etc/os-release ]]; then . /etc/os-release; printf '%s\n' "${PRETTY_NAME:-Linux}"; else printf 'Linux\n'; fi
 printf '重构 daemon：'
-systemctl is-active faceauth-rebuild.service 2>/dev/null || true
+systemctl is-active faceauth-linux.service 2>/dev/null || true
 printf '重构 PAM 模块：'
-if [[ -f /usr/lib/faceauth-rebuild/pam_faceauth_rebuild.so ]]; then echo '已安装'; else echo '未安装（先在独立模式下完成编译和服务安装）'; fi
+if [[ -f /usr/lib/faceauth-linux/pam_faceauth_linux.so ]]; then echo '已安装'; else echo '未安装（先在独立模式下完成编译和服务安装）'; fi
 printf '独立测试栈：'
-if [[ -f /etc/pam.d/faceauth-rebuild-test ]]; then echo '已安装'; else echo '未安装'; fi
+if [[ -f /etc/pam.d/faceauth-linux-test ]]; then echo '已安装'; else echo '未安装'; fi
 printf '\n=== 检查五个服务中是否存在旧版/新版 FaceAuth 挂载 ===\n'
 for s in sudo gdm-password polkit-1 su login; do
     f="/etc/pam.d/$s"
@@ -47,8 +47,8 @@ for s in common-auth other; do
     fi
 done
 printf '\n=== 检查紧急回滚工具 ===\n'
-if [[ -x /usr/libexec/faceauth-rebuild/faceauth-scenes ]]; then
-    echo '独立回滚工具存在：/usr/libexec/faceauth-rebuild/faceauth-scenes'
+if [[ -x /usr/libexec/faceauth-linux/faceauth-scenes ]]; then
+    echo '独立回滚工具存在：/usr/libexec/faceauth-linux/faceauth-scenes'
 else
     echo '尚未安装回滚工具；禁止启用真实 sudo/GDM/polkit'
     bad=1

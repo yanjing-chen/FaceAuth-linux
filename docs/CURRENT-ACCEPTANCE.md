@@ -2,8 +2,8 @@
 
 ## 已验收的正式系统
 - 生产 daemon 为 v0.1.6，已恢复此前的备份，两个文件 SHA256 相同：`6e56522ad0e74405565e2975ff2eb58b84eb7b80248078091a07e48646cde486`（用户当时机器上的二进制哈希，仅用于记录，不用于验证本 ZIP 的源码）。
-- `faceauth-rebuild-cli LIST chen`：`OK 1 我`。
-- `faceauth-rebuild-cli TEST chen`：连续三次 `accepted`，相似度 0.853、0.853、0.818。
+- `faceauth-linux-cli LIST chen`：`OK 1 我`。
+- `faceauth-linux-cli TEST chen`：连续三次 `accepted`，相似度 0.853、0.853、0.818。
 - 以 root 运行 `pamtester -v gdm-password chen authenticate` 和 `pamtester -v polkit-1 chen authenticate`：两者均无需密码成功。GUI 实际 GDM、polkit 代理仍待单独验收。
 - 之前 sudo 已验证人脸成功和密码回退；RC2 安装失败时也能回退密码。
 

@@ -15,19 +15,19 @@ if [[ -e "$SOCK_DIR/daemon.sock" ]]; then
    echo "测试 socket 已存在，请先关闭旧的测试 daemon: $SOCK_DIR/daemon.sock" >&2
    exit 1
 fi
-mkdir -p "$HOME/.config/faceauth-rebuild"
-chmod 700 "$HOME/.config/faceauth-rebuild"
-if [[ ! -e "$HOME/.config/faceauth-rebuild/config" ]]; then
-    cat > "$HOME/.config/faceauth-rebuild/config" <<'CONF'
+mkdir -p "$HOME/.config/faceauth-linux"
+chmod 700 "$HOME/.config/faceauth-linux"
+if [[ ! -e "$HOME/.config/faceauth-linux/config" ]]; then
+    cat > "$HOME/.config/faceauth-linux/config" <<'CONF'
 mode=dual
 rgb_device=
 ir_device=
 liveness=heuristic
 threshold=0.6
 CONF
-    chmod 600 "$HOME/.config/faceauth-rebuild/config"
+    chmod 600 "$HOME/.config/faceauth-linux/config"
 fi
-"$ROOT/target/debug/faceauth-daemon" --dev >"${XDG_RUNTIME_DIR}/faceauth-rebuild-dev.log" 2>&1 &
+"$ROOT/target/debug/faceauth-daemon" --dev >"${XDG_RUNTIME_DIR}/faceauth-linux-dev.log" 2>&1 &
 DAEMON_PID=$!
 cleanup() { kill "$DAEMON_PID" 2>/dev/null || true;wait "$DAEMON_PID" 2>/dev/null || true;rm -f "$SOCK_DIR/daemon.sock"; }
 trap cleanup EXIT
@@ -36,7 +36,7 @@ for i in $(seq 1 50); do
     sleep 0.1
 done
 if [[ ! -S "$SOCK_DIR/daemon.sock" ]]; then
-    cat "${XDG_RUNTIME_DIR}/faceauth-rebuild-dev.log"
+    cat "${XDG_RUNTIME_DIR}/faceauth-linux-dev.log"
     exit 1
 fi
 "$ROOT/scripts/launch-gui.sh" --dev "$@"

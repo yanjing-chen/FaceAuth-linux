@@ -2,7 +2,7 @@
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
 <policyconfig>
   <vendor>FaceAuth Rebuild</vendor>
-  <action id="org.faceauth.rebuild.manage-scenes">
+  <action id="org.faceauth.linux.manage-scenes">
     <description>Manage FaceAuth authentication services</description>
     <message>Administrator authorization is required to change system PAM authentication services.</message>
     <description xml:lang="zh_CN">管理 FaceAuth 系统认证场景</description>

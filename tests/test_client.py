@@ -35,7 +35,7 @@ class ClientTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             original=module.CONFIG
             try:
-                module.CONFIG=Path(temp)/'.config'/'faceauth-rebuild'/'config'
+                module.CONFIG=Path(temp)/'.config'/'faceauth-linux'/'config'
                 module.save_config({'mode':'rgb','rgb_device':'/dev/v4l/by-id/test'})
                 self.assertEqual(stat.S_IMODE(module.CONFIG.stat().st_mode), 0o600)
                 self.assertEqual(module.load_config()['mode'],'rgb')

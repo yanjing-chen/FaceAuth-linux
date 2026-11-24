@@ -1,15 +1,15 @@
 [Unit]
-Description=FaceAuth Rebuild privileged camera and authentication daemon
+Description=FaceAuth Linux privileged camera and authentication daemon
 After=local-fs.target systemd-udev-settle.service
 
 [Service]
 Type=simple
 User=root
 Group=root
-ExecStart=/usr/libexec/faceauth-rebuild/faceauth-daemon
-RuntimeDirectory=faceauth-rebuild
+ExecStart=/usr/libexec/faceauth-linux/faceauth-daemon
+RuntimeDirectory=faceauth-linux
 RuntimeDirectoryMode=0755
-StateDirectory=faceauth-rebuild
+StateDirectory=faceauth-linux
 StateDirectoryMode=0700
 UMask=0077
 Restart=on-failure

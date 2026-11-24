@@ -4,11 +4,11 @@
 use std::{fs, io::{self,Write},os::unix::fs::{MetadataExt,OpenOptionsExt,PermissionsExt},path::{Path,PathBuf},time::{SystemTime,UNIX_EPOCH}};
 
 pub const SERVICES:[&str;5]=["sudo","gdm","su","login","polkit"];
-pub const PAM_MODULE:&str="/usr/lib/faceauth-rebuild/pam_faceauth_rebuild.so";
+pub const PAM_MODULE:&str="/usr/lib/faceauth-linux/pam_faceauth_linux.so";
 const BEGIN:&str="# FaceAuth-Rebuild managed BEGIN";
 const VENDOR_BEGIN:&str="# FaceAuth-Rebuild managed BEGIN vendor-override";
 const END:&str="# FaceAuth-Rebuild managed END";
-const PAM_AUTH:&str="auth    [success=done default=ignore]    /usr/lib/faceauth-rebuild/pam_faceauth_rebuild.so";
+const PAM_AUTH:&str="auth    [success=done default=ignore]    /usr/lib/faceauth-linux/pam_faceauth_linux.so";
 
 pub fn allowed_service(name:&str)->Option<&'static str>{match name{
     "sudo"=>Some("sudo"),"gdm"=>Some("gdm-password"),
@@ -16,7 +16,7 @@ pub fn allowed_service(name:&str)->Option<&'static str>{match name{
 
 pub struct SceneManager { pam_dir:PathBuf, vendor_dir:PathBuf,backup_dir:PathBuf, dev:bool }
 impl SceneManager {
-    pub fn production()->Self{Self{pam_dir:"/etc/pam.d".into(),vendor_dir:"/usr/lib/pam.d".into(),backup_dir:"/var/lib/faceauth-rebuild/backups".into(),dev:false}}
+    pub fn production()->Self{Self{pam_dir:"/etc/pam.d".into(),vendor_dir:"/usr/lib/pam.d".into(),backup_dir:"/var/lib/faceauth-linux/backups".into(),dev:false}}
     pub fn sandbox(base:&Path)->Self{Self{pam_dir:base.join("pam.d"),vendor_dir:base.join("vendor-pam.d"),backup_dir:base.join("backups"),dev:true}}
     pub fn initialize_sandbox(&self)->Result<(),String>{
         if !self.dev{return Err("sandbox initialization forbidden in system mode".into());}
@@ -99,7 +99,7 @@ impl SceneManager {
     fn atomic_replace(path:&Path,body:&str,mode:u32)->Result<(),String>{
         let parent=path.parent().ok_or("missing PAM directory")?;
         let now=SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e|e.to_string())?.as_nanos();
-        let temp=parent.join(format!(".faceauth-rebuild-{}-{}",std::process::id(),now));
+        let temp=parent.join(format!(".faceauth-linux-{}-{}",std::process::id(),now));
         let operation=(||->Result<(),String>{
             let mut f=fs::OpenOptions::new().create_new(true).write(true).mode(0o600).open(&temp).map_err(|e|e.to_string())?;
             f.write_all(body.as_bytes()).map_err(|e|e.to_string())?;

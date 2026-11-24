@@ -5,7 +5,7 @@ fn main(){
     let dev=args.first().map(|x|x=="--dev").unwrap_or(false);
     let cmd=if dev{&args[1..]}else{&args[..]};
     if cmd.is_empty()||cmd.iter().any(|x|x.contains(char::is_whitespace)){eprintln!("invalid command");std::process::exit(2);}
-    let socket=if dev{format!("{}/faceauth-dev/daemon.sock",env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_|format!("/run/user/{}",env::var("UID").unwrap_or_else(|_|"1000".into()))))}else{"/run/faceauth-rebuild/daemon.sock".into()};
+    let socket=if dev{format!("{}/faceauth-dev/daemon.sock",env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_|format!("/run/user/{}",env::var("UID").unwrap_or_else(|_|"1000".into()))))}else{"/run/faceauth-linux/daemon.sock".into()};
     let mut s=UnixStream::connect(socket).expect("cannot connect to FaceAuth daemon");
     s.set_read_timeout(Some(Duration::from_secs(30))).ok();s.set_write_timeout(Some(Duration::from_secs(5))).ok();
     s.write_all(format!("{}\n",cmd.join(" ")).as_bytes()).expect("write failed");

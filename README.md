@@ -1,4 +1,4 @@
-# FaceAuth Rebuild
+# FaceAuth Linux
 
 [![build](https://github.com/yanjing-chen/FaceAuth-linux/actions/workflows/build.yml/badge.svg)](https://github.com/yanjing-chen/FaceAuth-linux/actions/workflows/build.yml)
 
@@ -16,9 +16,13 @@ git clone https://github.com/yanjing-chen/FaceAuth-linux.git && cd FaceAuth-linu
 
 命令依次完成：克隆 → 装依赖 → 下载 OpenCV Zoo 模型（YuNet + SFace，约 38 MB）→ 编译 Rust 组件 → 安装 systemd 服务、PAM 模块、polkit 策略与 CLI。
 
-安装完成后服务 `faceauth-rebuild.service` 已启用，但**默认不挂载任何 PAM 场景**，需在 GUI 里逐项启用。
+安装完成后服务 `faceauth-linux.service` 已启用，但**默认不挂载任何 PAM 场景**，需在 GUI 里逐项启用。
 
-> 已有旧版服务时，`install-system.sh` 会检测到现存的 service 文件并拒绝覆盖（防止误重装）。升级请先 `sudo bash scripts/uninstall-system.sh`。
+> 从旧版 `faceauth-rebuild` 升级时，**不要直接跑上面的安装命令**——用迁移脚本，它会保留你的配置与人脸模板：
+> ```bash
+> sudo bash scripts/migrate-rebuild-to-linux.sh
+> ```
+> 迁移脚本会备份旧数据、迁移用户配置/模板、卸载旧服务、再安装新组件。全新机器用上面的安装命令即可。
 
 ## 首次使用
 
@@ -28,7 +32,7 @@ git clone https://github.com/yanjing-chen/FaceAuth-linux.git && cd FaceAuth-linu
 bash scripts/launch-gui.sh
 ```
 
-1. 在「摄像头」里选 RGB 与 IR 设备（优先 `/dev/v4l/by-path/` 稳定路径），点「检查两路」确认彩色/红外角色正确；
+1. 在「摄像头」里选 RGB 与 IR 设备（优先 `/dev/v4l/by-path/` 稳定路径），点「检查摄像头 / 检查两路」确认实际画面角色正确；
 2. 录入人脸：先采集 5 帧，再弹 polkit 框授权写入；
 3. 用「识别测试」确认通过率；
 4. 在「系统认证」组按需启用 sudo / GDM / polkit 场景，每项都会弹管理员授权框。
@@ -38,11 +42,11 @@ bash scripts/launch-gui.sh
 ## 命令行
 
 ```bash
-faceauth-rebuild-cli PING
-faceauth-rebuild-cli LIST <用户名>
-faceauth-rebuild-cli TEST <用户名>
-faceauth-rebuild-cli SCENE_LIST <用户名>
-sudo /usr/libexec/faceauth-rebuild/faceauth-scenes on|off sudo|gdm|su|login|polkit
+faceauth-linux-cli PING
+faceauth-linux-cli LIST <用户名>
+faceauth-linux-cli TEST <用户名>
+faceauth-linux-cli SCENE_LIST <用户名>
+sudo /usr/libexec/faceauth-linux/faceauth-scenes on|off sudo|gdm|su|login|polkit
 ```
 
 ## 可调设置

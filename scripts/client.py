@@ -14,12 +14,12 @@ DEFAULTS = {
     'ssh_disabled': '1', 'dark_ir_skip': '1', 'auth_frames': '3',
     'dark_threshold': '60', 'auth_timeout': '4.0', 'liveness_strictness': '0.50',
 }
-CONFIG = Path.home() / '.config' / 'faceauth-rebuild' / 'config'
+CONFIG = Path.home() / '.config' / 'faceauth-linux' / 'config'
 
 
 def current_socket():
     # --dev launcher exports FACEAUTH_SOCKET. Production never needs an override.
-    return os.environ.get('FACEAUTH_SOCKET', '/run/faceauth-rebuild/daemon.sock')
+    return os.environ.get('FACEAUTH_SOCKET', '/run/faceauth-linux/daemon.sock')
 
 
 def request(line, timeout=6.0, max_bytes=8192):
@@ -47,10 +47,10 @@ def valid_label(label):
                 and not any(c.isspace() or c in ',/\\' or ord(c)<32 for c in label))
 
 
-MODEL_AUTH_ACTION = 'org.faceauth.rebuild.manage-models'
+MODEL_AUTH_ACTION = 'org.faceauth.linux.manage-models'
 
 
-ADMIN_CLI = '/usr/bin/faceauth-rebuild-cli'
+ADMIN_CLI = '/usr/bin/faceauth-linux-cli'
 
 
 def admin_request(line, timeout=90):

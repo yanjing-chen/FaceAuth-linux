@@ -10,7 +10,7 @@ class SafetyContract(unittest.TestCase):
         self.assertNotIn('DISPLAY',pam)
         self.assertIn('PAM_IGNORE',pam)
         self.assertIn('name = "pam_faceauth"',manifest)
-        self.assertIn('/run/faceauth-rebuild/daemon.sock',pam)
+        self.assertIn('/run/faceauth-linux/daemon.sock',pam)
     def test_no_automatic_live_pam_modifications_in_dev(self):
         shell=(ROOT/'scripts/run-dev.sh').read_text()
         self.assertIn('--dev',shell)
@@ -30,22 +30,22 @@ class SafetyContract(unittest.TestCase):
         self.assertIn('validate_managed',scene)
         self.assertIn('pam_faceauth.so',scene)  # prevents duplicate legacy hooking
     def test_polkit_policy_requires_admin(self):
-        root=ET.parse(ROOT/'packaging/org.faceauth.rebuild.manage-scenes.policy').getroot()
-        self.assertEqual(root.find('action').attrib['id'], 'org.faceauth.rebuild.manage-scenes')
+        root=ET.parse(ROOT/'packaging/org.faceauth.linux.manage-scenes.policy').getroot()
+        self.assertEqual(root.find('action').attrib['id'], 'org.faceauth.linux.manage-scenes')
         self.assertEqual(root.find('.//allow_active').text, 'auth_admin')
         self.assertEqual(root.find('.//allow_any').text, 'no')
     def test_script_install_is_explicit(self):
         script=(ROOT/'scripts/install-system.sh').read_text()
         self.assertIn('EUID != 0',script)
         self.assertIn('cargo build --release',script)
-        self.assertIn('faceauth-rebuild.service',script)
+        self.assertIn('faceauth-linux.service',script)
         self.assertNotIn('SCENE_ON',script)
         self.assertNotIn('sed -i /etc/pam',script)
     def test_root_not_exec_user_program(self):
         config=(ROOT/'src/core/src/config.rs').read_text()
         self.assertIn('NEVER execute it as root',config)
         daemon=(ROOT/'src/daemon/src/main.rs').read_text()
-        self.assertIn('/usr/libexec/faceauth-rebuild/scripts',daemon)
+        self.assertIn('/usr/libexec/faceauth-linux/scripts',daemon)
     def test_gui_scene_switches_are_real(self):
         gui=(ROOT/'scripts/faceauth_gui.py').read_text()
         self.assertIn('Adw.SwitchRow(',gui)

@@ -1,4 +1,4 @@
-# FaceAuth Rebuild 0.1.6 安全说明
+# FaceAuth Linux 0.1.6 安全说明
 
 ## 已实现的防护
 
@@ -25,9 +25,9 @@
 即使守护进程崩溃仍可：
 
 ```
-sudo /usr/libexec/faceauth-rebuild/faceauth-scenes off sudo
-sudo /usr/libexec/faceauth-rebuild/faceauth-scenes off gdm
-sudo /usr/libexec/faceauth-rebuild/faceauth-scenes off polkit
+sudo /usr/libexec/faceauth-linux/faceauth-scenes off sudo
+sudo /usr/libexec/faceauth-linux/faceauth-scenes off gdm
+sudo /usr/libexec/faceauth-linux/faceauth-scenes off polkit
 ```
 
 详见 README。部署之前务必保持 root shell 与密码凭据可用。

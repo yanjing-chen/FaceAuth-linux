@@ -206,7 +206,7 @@ impl Pipeline {
 fn system_config(_rt:&Runtime,user:&str)->Result<Config,String>{
     let uid=peer::user_uid(user).ok_or("user not found")?;
     let home=peer::home_dir(user).ok_or("home not found")?;
-    let path=Path::new(&home).join(".config/faceauth-rebuild/config");
+    let path=Path::new(&home).join(".config/faceauth-linux/config");
     let meta=fs::symlink_metadata(&path).map_err(|e|e.to_string())?;
     if meta.file_type().is_symlink()||!meta.is_file(){return Err("invalid config file".into());}
     use std::os::unix::fs::MetadataExt;
@@ -267,11 +267,11 @@ fn authorize_action(rt:&Runtime, uid:u32, pid:i32, action:&str)->Result<(),Strin
     Ok(())
 }
 fn authorize_scene(rt:&Runtime,uid:u32,pid:i32)->Result<(),String>{
-    authorize_action(rt,uid,pid,"org.faceauth.rebuild.manage-scenes")
+    authorize_action(rt,uid,pid,"org.faceauth.linux.manage-scenes")
 }
 /// 录入/删除人脸需要管理员授权，防止他人在同一会话中偷偷登记或删除人脸。
 fn authorize_models(rt:&Runtime,uid:u32,pid:i32)->Result<(),String>{
-    authorize_action(rt,uid,pid,"org.faceauth.rebuild.manage-models")
+    authorize_action(rt,uid,pid,"org.faceauth.linux.manage-models")
 }
 fn handle(rt:&Runtime,pipe:&Mutex<Pipeline>,uid:u32,pid:i32,input:&str)->String {
     let p:Vec<&str>=input.split_whitespace().collect();
@@ -412,9 +412,9 @@ fn run()->Result<(),Box<dyn std::error::Error>>{
     let (directory,script_dir,store_dir)=if dev{
         let base=PathBuf::from(env::var("XDG_RUNTIME_DIR")? ).join("faceauth-dev");
         let home=PathBuf::from(env::var("HOME")?);
-        (base.clone(),root.join("scripts"),home.join(".local/share/faceauth-rebuild/models"))
+        (base.clone(),root.join("scripts"),home.join(".local/share/faceauth-linux/models"))
     }else{
-        (PathBuf::from("/run/faceauth-rebuild"),PathBuf::from("/usr/libexec/faceauth-rebuild/scripts"),PathBuf::from("/var/lib/faceauth-rebuild/models"))
+        (PathBuf::from("/run/faceauth-linux"),PathBuf::from("/usr/libexec/faceauth-linux/scripts"),PathBuf::from("/var/lib/faceauth-linux/models"))
     };
     fs::create_dir_all(&directory)?;
     fs::set_permissions(&directory,fs::Permissions::from_mode(if dev{0o700}else{0o755}))?;
