@@ -15,23 +15,27 @@ fn hex_nibble(b:u8)->Option<u8>{match b{b'0'..=b'9'=>Some(b-b'0'),b'a'..=b'f'=>S
 /// 占全部采样的百分比。补光闪烁产生的全黑帧该值接近 100，正常 IR 帧很低。
 /// 采样而非全解析：每 step 个像素取一个，足以判定明暗分布且开销可控。
 fn ir_darkness(hex:&str)->Option<f32>{
+    // 统计"接近纯黑"（灰度值 <= 2）像素的占比。真正的补光闪烁废帧整帧几乎
+    // 无信号，该值接近 100%；正常偏暗的 IR 帧虽均值低，但有结构，该值很低
+    // （实测正常帧仅约 8%）。旧版用"最暗 1/8 桶占比"，开灯后可用帧该值高达
+    // 76.6% 被误杀，故改用更精准的纯黑判定。
     let b=hex.as_bytes();
     if b.len()<2 || b.len()%2!=0 {return None;}
     let step=((b.len()/2)/4096).max(1); // 最多约 4096 个采样点
-    let mut hist=[0u32;8];let mut total=0u32;
+    let mut black=0u32;let mut total=0u32;
     let mut i=0usize;let mut idx=0usize;
     while i+1<b.len(){
         if idx%step==0{
             if let (Some(hi),Some(lo))=(hex_nibble(b[i]),hex_nibble(b[i+1])){
                 let v=hi*16+lo;
-                hist[(v as usize)>>5]+=1; // 0-255 -> 0-7
+                if v<=2{black+=1;}
                 total+=1;
             }
         }
         i+=2;idx+=1;
     }
     if total==0{return Some(100.0);}
-    Some(hist[0] as f32*100.0/total as f32)
+    Some(black as f32*100.0/total as f32)
 }
 fn parse_snap(text:&str)->Result<Snap,String>{
     let mut parts=text.splitn(7,' ');
@@ -119,12 +123,12 @@ impl Pipeline {
             if s.ir_w==0 || s.ir_h==0{return Err("IR required".into());}
             (s.ir_w,s.ir_h,&s.ir_gray)
         }else{(s.w,s.h,&s.gray)};
-        // 暗 IR 帧跳过（howdy 风格）：8 桶直方图最低桶占比 > 60% 视为补光
-        // 闪烁造成的废帧，拒绝本帧让轮询重取。实测正常 IR 帧该值 0.1~10.4%，
-        // 全黑帧接近 100%，阈值 60 有充足区分度。
+        // 暗 IR 帧跳过：接近纯黑像素占比 > 阈值视为补光闪烁废帧。
+        // 返回 Ok(false)（本帧活体不通过）而非 Err——Err 会让录入采集整轮
+        // 终止，而识别侧只是跳过该帧，两侧行为必须一致。
         if cfg.dark_ir_skip && cfg.mode=="dual" {
             if let Some(darkness)=ir_darkness(gray){
-                if darkness>cfg.dark_threshold{return Err("dark IR frame skipped".into());}
+                if darkness>cfg.dark_threshold{return Ok(false);}
             }
         }
         let result=match self.engine(rt)?.query(&format!("LIVENESS {w} {h} {gray}")){
@@ -468,21 +472,27 @@ mod tests {
     use super::*;
     fn hex_of(v:u8,n:usize)->String{format!("{v:02x}").repeat(n)}
     #[test] fn darkness_black_frame(){
-        // 全黑帧：最低桶占比 100%
+        // 全黑帧：接近纯黑占比 100%
         assert_eq!(ir_darkness(&hex_of(0,2048)),Some(100.0));
     }
     #[test] fn darkness_bright_frame(){
-        // 全亮帧（255 落在最高桶）：最低桶占比 0%
+        // 全亮帧：接近纯黑占比 0%
         assert_eq!(ir_darkness(&hex_of(255,2048)),Some(0.0));
     }
-    #[test] fn darkness_normal_distribution(){
-        // 正常 IR 帧：90% 像素在中高桶，10% 在最暗桶 -> darkness≈10%，
-        // 远低于 60 阈值（实测本机正常帧 0.1~10.4%）
+    #[test] fn darkness_dark_but_usable_frame(){
+        // 偏暗但可用的 IR 帧（值 3~7，开灯后实测均值 31 的帧）：
+        // 值>2 不算纯黑，darkness≈0%，不会被 60 阈值误杀。
         let mut s=String::new();
-        for i in 0..1000 { s.push_str(if i<100 {"05"} else {"60"}); }
+        for i in 0..1000 { s.push_str(if i<500 {"05"} else {"20"}); }
         let d=ir_darkness(&s).unwrap();
-        assert!(d>=9.0 && d<=11.0, "darkness={d}");
-        assert!(d<60.0); // 默认暗帧阈值
+        assert!(d<1.0, "darkness={d} 不应把偏暗但有结构的帧判为废帧");
+    }
+    #[test] fn darkness_mixed_frame(){
+        // 混合帧：60% 纯黑 + 40% 有信号 -> darkness≈60%，恰好达阈值边界。
+        let mut s=String::new();
+        for i in 0..1000 { s.push_str(if i<600 {"00"} else {"60"}); }
+        let d=ir_darkness(&s).unwrap();
+        assert!(d>=59.0 && d<=61.0, "darkness={d}");
     }
     #[test] fn darkness_invalid_hex(){
         // 非法 hex 按最坏情况（黑帧）处理，保证不会误放行；奇数长度拒绝。

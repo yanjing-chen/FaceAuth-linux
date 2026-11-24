@@ -471,8 +471,8 @@ class FaceAuthApp(Adw.Application):
         # 三个可调识别参数：数值框 + 上下按钮，每项 subtitle 说明调节意义。
         self._tunable_spin(
             adv_group, 'dark_threshold_row', '暗帧判定阈值（%）',
-            '8 桶直方图中最暗区域的占比，超过即丢弃该帧（默认 60）。'
-            '调低＝更严格丢弃暗帧，适合补光不稳；调高＝容忍更暗画面',
+            '接近纯黑（灰度≤2）像素的占比，超过即视为废帧（默认 60）。'
+            '偏暗但有结构的画面不会被误杀；调高＝更容忍暗画面',
             'dark_threshold', 60, 20, 95, 1, 0,
             lambda v: f'{v:.0f}', '暗帧阈值已保存；请重新做识别测试')
         self._tunable_spin(
