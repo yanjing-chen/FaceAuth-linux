@@ -1,0 +1,37 @@
+name: build
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Keep this dependency list in sync with the one-line install command in README.
+      # CI builds on a clean Ubuntu so missing system libs (e.g. libpam0g-dev for -lpam)
+      # fail here instead of on a user's machine.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cargo rustc curl libpam0g-dev \
+            python3-opencv python3-numpy python3-gi \
+            gir1.2-gtk-4.0 gir1.2-adw-1 libadwaita-1-0
+
+      - name: Download OpenCV Zoo models
+        run: bash scripts/fetch-models.sh
+
+      - name: Build all Rust components
+        run: cargo build --release --workspace
+
+      - name: Rust unit tests
+        run: cargo test --workspace
+
+      - name: Python unit tests
+        run: /usr/bin/python3 -m unittest discover -s tests -q
+
+      - name: Verify source (syntax + tests)
+        run: bash scripts/verify-source.sh
