@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Keep this dependency list in sync with the one-line install command in README.
       # CI builds on a clean Ubuntu so missing system libs (e.g. libpam0g-dev for -lpam)
