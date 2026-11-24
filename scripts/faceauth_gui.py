@@ -1001,7 +1001,7 @@ class FaceAuthApp(Adw.Application):
     def confirm_delete(self, label):
         dialog = Adw.AlertDialog()
         dialog.set_heading(f'确认删除「{label}」？' if label else '确认删除全部人脸？')
-        dialog.set_body('删除不可撤销。下一步需要现场刷脸验证本人身份（含活体检查），验证通过才会删除。')
+        dialog.set_body('删除不可撤销。下一步先现场刷脸验证本人；刷脸不可用时可改用管理员密码验证。')
         dialog.add_response('cancel', '取消')
         dialog.add_response('delete', '下一步：刷脸验证')
         dialog.set_response_appearance('delete', Adw.ResponseAppearance.DESTRUCTIVE)
@@ -1025,19 +1025,34 @@ class FaceAuthApp(Adw.Application):
         if not self._deleting:
             return
         if not response.startswith('OK ') or 'accepted' not in response:
-            self._deleting = False
-            self.status.set_label('刷脸验证未通过，人脸未被删除。' + response)
+            # 刷脸失败：给密码回退选项，而不是直接卡死取消。
+            # 密码验证走 pkexec 管理员授权，安全等级不降低。
+            self.status.set_label('刷脸验证未通过，可选择管理员密码验证删除。')
             dlg = Adw.AlertDialog()
-            dlg.set_heading('删除已取消')
-            dlg.set_body('现场刷脸验证未通过（或识别暂不可用），没有删除任何人脸。')
-            dlg.add_response('close', '关闭')
-            dlg.set_default_response('close')
-            dlg.set_close_response('close')
-            dlg.present(self.win)
+            dlg.set_heading('刷脸验证未通过')
+            dlg.set_body('现场刷脸未通过（或识别暂不可用）。可改用管理员密码验证后删除；取消则不会删除任何人脸。')
+            dlg.add_response('cancel', '取消')
+            dlg.add_response('password', '改用密码验证')
+            dlg.set_response_appearance('password', Adw.ResponseAppearance.DESTRUCTIVE)
+            dlg.set_default_response('cancel')
+            dlg.set_close_response('cancel')
+            dlg.choose(self.win, None,
+                       lambda d, r: self.delete_fallback_chosen(d.choose_finish(r), response))
             return
         # 刷脸通过：第二道关用 pkexec 以 root 写入（GUI 不提权）。
+        self._commit_delete('刷脸验证通过，正在执行删除…')
+
+    def delete_fallback_chosen(self, result, face_reason):
+        if result != 'password':
+            self._deleting = False
+            self.status.set_label('删除已取消，人脸未被删除。')
+            return
+        # 密码回退：pkexec 管理员授权是独立的一道强验证。
+        self._commit_delete('已选择密码验证，请在弹框中输入管理员密码…')
+
+    def _commit_delete(self, status_text):
         label = self._pending_delete_label
-        self.status.set_label('刷脸验证通过，正在执行删除…')
+        self.status.set_label(status_text)
         command = (f'DELETE_FACE {self.user} {label}' if label else f'DELETE {self.user}')
         def commit():
             reply = admin_request(command)
@@ -1046,13 +1061,6 @@ class FaceAuthApp(Adw.Application):
 
     def delete_done(self, response):
         self._deleting = False
-        denied = 'authorization' in (response or '').lower()
-        note = ('管理员授权未通过，人脸未被删除。' if denied else response)
-        self.status.set_label(note)
-        self.settings_feedback.set_label('人脸管理：' + note)
-        self.refresh_lists()
-
-    def delete_done(self, response):
         denied = 'authorization' in (response or '').lower()
         note = ('管理员授权未通过，人脸未被删除。' if denied else response)
         self.status.set_label(note)
