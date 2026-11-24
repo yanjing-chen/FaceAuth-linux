@@ -498,14 +498,14 @@ class FaceAuthApp(Adw.Application):
             description='支持复合模组或两台独立摄像头；完整路径可在菜单中查看')
         self.rgb_choice = self.device_picker('RGB 彩色', 'rgb_device', dev_group)
         self.ir_choice = self.device_picker('IR 红外', 'ir_device', dev_group)
-        self.device_status_row = Adw.ActionRow(title='视频通道检测',
+        self.device_status_row = Adw.ActionRow(title='摄像头检测',
             subtitle='点击检查按钮以读取所选摄像头的实际画面')
         self.device_status_row.set_subtitle_lines(4)
-        check_channels = Gtk.Button(label='检查两路')
-        check_channels.set_valign(Gtk.Align.CENTER)
-        check_channels.add_css_class('fa-small-button')
-        check_channels.connect('clicked', self.check_camera_channels)
-        self.device_status_row.add_suffix(check_channels)
+        self.check_channels_btn = Gtk.Button(label='检查摄像头')
+        self.check_channels_btn.set_valign(Gtk.Align.CENTER)
+        self.check_channels_btn.add_css_class('fa-small-button')
+        self.check_channels_btn.connect('clicked', self.check_camera_channels)
+        self.device_status_row.add_suffix(self.check_channels_btn)
         dev_group.add(self.device_status_row)
         rescan_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         rescan_actions.set_halign(Gtk.Align.END)
@@ -650,6 +650,7 @@ class FaceAuthApp(Adw.Application):
         idx = row.get_selected()
         self.cfg[key] = self.device_paths[idx-1] if 1 <= idx <= len(self.device_paths) else ''
         self.save_settings('设备已更改，请核对所选摄像头的实际图像')
+        self.update_camera_row_visibility()  # 单/双摄切换时同步按钮文字
         self.rescan_devices()
         self.async_request(f'DEVICE_TYPES {self.user}', self.apply_detected_types)
 
@@ -657,6 +658,13 @@ class FaceAuthApp(Adw.Application):
         mode = self.cfg.get('mode', 'dual')
         self.rgb_choice.set_visible(mode != 'ir')
         self.ir_choice.set_visible(mode != 'rgb')
+        # 单摄机器（只有 RGB 或只有 IR）不该看到“检查两路”这种字样。
+        dual = (mode == 'dual' and self.cfg.get('rgb_device') and self.cfg.get('ir_device'))
+        label = '检查两路' if dual else '检查摄像头'
+        if hasattr(self, 'check_channels_btn'):
+            self.check_channels_btn.set_label(label)
+        if hasattr(self, 'device_status_row'):
+            self.device_status_row.set_title('视频通道检测' if dual else '摄像头检测')
 
     def change_mode(self, row, _spec):
         self.cfg['mode'] = MODES[row.get_selected()][0]
@@ -753,7 +761,15 @@ class FaceAuthApp(Adw.Application):
                 self.device_status_row.set_subtitle('配置错误：RGB 与 IR 选择了同一个视频节点。双模必须分别选择不同节点。')
                 return
         if self.device_status_row is not None:
-            self.device_status_row.set_subtitle('正在读取 RGB / IR 实际图像，请稍候…')
+            self.device_status_row.set_subtitle('正在启动预览并读取摄像头画面，请稍候…')
+        # DEVICE_TYPES 需要 daemon 侧存在预览会话；GUI 刚打开或预览过期时
+        # 直接请求会报 preview not active。先确保预览启动，再在同一回调里检测。
+        self.async_request(f'PREVIEW_START {self.user}', self._check_after_preview, timeout=12)
+
+    def _check_after_preview(self, response):
+        if response != 'OK preview started':
+            self.device_status_row.set_subtitle('无法启动预览以检测摄像头：' + response[:160])
+            return
         self.async_request(f'DEVICE_TYPES {self.user}', self.apply_detected_types, timeout=12)
 
     def apply_detected_types(self, response):
