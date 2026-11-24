@@ -9,7 +9,7 @@ Linux 下的双摄人脸识别认证：RGB 摄像头做身份识别、IR 摄像�
 Ubuntu / Debian 系发行版，从源码构建、下载模型并安装系统服务：
 
 ```bash
-git clone https://github.com/yanjing-chen/faceauth-rebuild.git && cd faceauth-rebuild && sudo apt update && sudo apt install -y cargo rustc curl python3-opencv python3-numpy python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 libadwaita-1-0 && bash scripts/fetch-models.sh && cargo build --release --workspace && sudo bash scripts/install-system.sh
+git clone https://github.com/yanjing-chen/FaceAuth-linux.git && cd FaceAuth-linux && sudo apt update && sudo apt install -y cargo rustc curl python3-opencv python3-numpy python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 libadwaita-1-0 && bash scripts/fetch-models.sh && cargo build --release --workspace && sudo bash scripts/install-system.sh
 ```
 
 命令依次完成：克隆 → 装依赖 → 下载 OpenCV Zoo 模型（YuNet + SFace，约 38 MB）→ 编译 Rust 组件 → 安装 systemd 服务、PAM 模块、polkit 策略与 CLI。
